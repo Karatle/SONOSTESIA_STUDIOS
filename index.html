@@ -1,0 +1,4407 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>SynthV1.6_StringIt1_001</title>
+	<meta charset="utf-8">
+	<!-- Compiled w/ P5LIVE, http://github.com/ffd8/p5live -->
+	<style type="text/css">
+		body{
+			margin:0;
+			overflow:hidden;
+		}
+		canvas{
+			position:fixed;
+			top:0;
+			left:0;
+			z-index:-1;
+			width:100vw;
+			height:100vh;
+			margin:0;
+		}
+	</style>
+	<script type="text/javascript">
+		// eco-mode = only render if window focused
+		window.onblur = function () {
+			noLoop();
+		};
+		window.onfocus = function () {
+			loop();
+		};
+	</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/p5@1/lib/p5.min.js"></script>
+<script type="text/javascript" src="includes/libs/tone.js"></script>
+</head>
+<body style="background: rgb(0, 0, 0);">
+
+<script type="text/javascript">
+//SynthV1.6_StringIt1_001
+
+/* CUSTOM FUNCTIONS FOR P5LIVE */
+// keep fullscreen if window resized
+function windowResized() {
+	resizeCanvas(windowWidth, windowHeight);
+}
+
+// custom ease function
+function ease(iVal, oVal, eVal){
+	return oVal += (iVal - oVal) * eVal;
+}
+
+// processing compatibility
+function println(msg){
+	print(msg);
+}
+
+
+let libs = ['includes/libs/tone.js']
+// no p5sound
+
+let length = 6
+
+let cutoff
+let cutoffEnvVal = 0
+
+let scaleUniv
+let spacingSlid
+let spacingV
+
+let standardUnit = 60
+let curveUnit = standardUnit * .26
+
+let fontSize = 13.5
+
+let mouseDown
+let mouseUp
+
+let globalWhite = 255
+let colActive = 255
+
+let knobMinMax = 3 * (Math.PI / 4)
+
+let loadBuffer = 0
+
+
+let pause = false
+
+let particleSystem
+let particleRender
+
+let synthRender
+let synthIndex
+
+let knobActive = false
+let bpm
+
+let demoPresets = ['/presets/demo1.json', '/presets/demo2.json', '/presets/demo3.json', '/presets/demo4.json']
+let initialize = ['/presets/initialize.json']
+let localData
+let userData = []
+let doubleClickTimer = 0
+let doubleClickInit = false
+let doubleClicked = false
+
+let loading = true
+let init = false
+let initCheck = false
+
+
+let font
+let saveSynthIndex
+let hideToggle = false
+
+function preload(){
+	font = loadFont('/includes/fonts/IosevkaCharon-Bold.ttf')
+	fontBody = loadFont('/includes/fonts/IosevkaCharon-Regular.ttf')
+}
+
+function setup() {
+
+	createCanvas(windowWidth, windowHeight)
+	pixelDensity(2)
+	// colActive = color(80, 0)
+	textFont(font)
+	standardUnit = height * .045
+	scaleUniv = width / (width * 2)
+	spacingV = standardUnit * 2
+	spacingSlid = standardUnit * .6
+
+	particleRender = createGraphics(width, height)
+	particleRender.clear()
+
+	fileMenu = new FileMenu(width / 2 - standardUnit * 10, height / 2 - standardUnit * 21, scaleUniv, scaleUniv, "File Menu")
+	
+	loadUserPresets()
+	synthSelect = new SynthSelect(width / 2 - standardUnit * 11, height / 2 - standardUnit * 18.5, scaleUniv, scaleUniv, "SYNTH", 1, 0)
+	sequencer = new Sequencer(width / 2 - standardUnit * 7, height - standardUnit * 13.7, scaleUniv, scaleUniv)
+	
+	synthekindas = []
+	particleSystems = []
+	for(let i = 0; i < 4; i++) {
+		synthekindas.push(new Synthekinda(width / 2 - standardUnit * 10.5, height - standardUnit * 22, i))
+		particleSystems.push(new ParticleSystem(0, 0, i))
+	}
+	input = createFileInput((file) => {
+		importData(file)
+	}).hide() //
+	textInput = createInput()
+	textInput.position(width/2, -100)
+	// textInput.hide()
+	loadDemoPresets()
+}
+
+function draw() {
+
+	updateVisuals()
+	background(0)
+
+	// clear()
+	translate(width / 2, height / 2)
+	push()
+	textSize(fontSize * 3)
+	textAlign(RIGHT)
+	if(synthIndex < 4){
+		text("SONOSTHESIA STUDIO", width / 2 - standardUnit * 1, height / 2 - standardUnit * 19)
+	}
+	pop()
+	colorMode(HSB, 255)
+	
+	image(particleRender, -width / 2, -height / 2)
+	
+	for(let psys of particleSystems) {
+		psys.display()
+	}
+	
+	if(fileMenu.imageButton.active == true) {
+		saveCanvas()
+	}
+	
+	if(fileMenu.fileButton.active == true) {
+		exportData()
+	}
+	colorMode(RGB, 255)
+	
+	if(hideToggle == true){
+		hideGUI()
+	}else{
+		synthIndex = synthSelect.synthIndex
+		synthSelect.display()
+	}
+	if(loadBuffer < 4 && loading == true){
+			for(let sk of synthekindas ){
+				sk.masterVolControl = 60
+			}
+			loadBuffer+=.1
+			synthSelect.synthIndex = floor(loadBuffer)
+		}
+	if(loadBuffer > 4 && loading == true){
+			if(initCheck == false){
+				init = true
+				initCheck = true
+			}
+			loading = false
+			synthSelect.synthIndex = 0
+	}
+	print(synthIndex)
+	sequencer.display()
+	
+	for(let sk of synthekindas) {
+		sk.display()
+		sk.gate = false
+	}
+	doubleClicked = false
+	if(mouseDown && doubleClickInit == true){
+		doubleClicked = true
+	}
+	if(mouseDown == true){
+		doubleClickInit = true
+	}
+	if(doubleClickInit == true){
+		doubleClickTimer++
+	}
+	if(doubleClickTimer > 15){
+		doubleClickTimer = 0
+		doubleClickInit = false
+	}
+	fileMenu.display()
+	
+	// if(loadBuffer < 2) {
+		// 	loadBuffer++
+		// }
+		// if(loadBuffer < 3 && loading == true){
+			// 	for(let sk of synthekindas ){
+				// 		sk.masterVolControl = 60
+				// 	}
+				// 	loadBuffer+=.1
+				// 	synthSelect.synthIndex = floor(loadBuffer)
+				// }
+				// if(loadBuffer > 4 && loading == true){
+					// 	loading = false
+					// 	synthSelect.synthIndex = 0
+					// }
+		mouseDown = false
+		init = false
+	}
+	
+function keyPressed() {
+
+	if(keyCode == 32) {
+		pause = !pause
+	}
+}
+
+function mousePressed() {
+	updateDataSynth()
+	updateDataSequencer()
+	updateVisuals()
+	mouseUp = false
+	mouseDown = true
+}
+
+function mouseReleased() {
+	mouseUp = true
+}
+
+function hideGUI() {
+	synthIndex = 4
+}
+
+function saveImage() {
+	// synthIndex = 4
+}
+
+function updateDataSequencer() {
+	sequencer.updateData()
+}
+
+function updateDataSynth() {
+
+	// for(let sk of synthekindas) {
+	for(let i = 0; i < synthekindas.length; i++) {
+		let sk = synthekindas[i]
+
+		sk.settingsSynth.effects.reverb.room = sk.effects.reverb.roomsizeKnob.knobPos
+		// sk.settingsSynth.effects.reverb.room = sk.effects.reverb.roomsizeKnob.knobPos
+		sk.settingsSynth.effects.reverb.wet = sk.effects.reverb.mixKnob.knobPos
+
+		sk.settingsSynth.effects.delay.time = sk.effects.delay.delayTimeKnob.knobPos
+		sk.settingsSynth.effects.delay.feedback = sk.effects.delay.feedbackKnob.knobPos
+		sk.settingsSynth.effects.delay.wet = sk.effects.delay.mixKnob.knobPos
+
+		sk.settingsSynth.effects.vibrato.frequency = sk.effects.vibrato.freqKnob.knobPos
+		sk.settingsSynth.effects.vibrato.depth = sk.effects.vibrato.depthKnob.knobPos
+		sk.settingsSynth.effects.vibrato.wet = sk.effects.vibrato.mixKnob.knobPos
+
+		sk.settingsSynth.effects.phaser.frequency = sk.effects.phaser.freqKnob.knobPos
+		sk.settingsSynth.effects.phaser.depth = sk.effects.phaser.depthKnob.knobPos
+		sk.settingsSynth.effects.phaser.resonance = sk.effects.phaser.resKnob.knobPos
+		sk.settingsSynth.effects.phaser.wet = sk.effects.phaser.mixKnob.knobPos
+
+		sk.settingsSynth.effects.distortion.amount = sk.effects.distortion.distortionKnob.knobPos
+		sk.settingsSynth.effects.distortion.wet = sk.effects.distortion.mixKnob.knobPos
+
+		sk.settingsSynth.master.volume = sk.synthMaster.volKnob.knobPos
+		sk.settingsSynth.master.pan = sk.synthMaster.panKnob.knobPos
+		sk.settingsSynth.master.noteLength = sequencer.sequencerTracks[i].noteLengthKnob.knobPos
+
+		sk.settingsSynth.source.shapeOsc = sk.source.waveType.shape
+		sk.settingsSynth.source.shapeMod = sk.source.modType.shape
+		sk.settingsSynth.source.fmModIndex = sk.source.modKnob.knobPos
+		sk.settingsSynth.source.fmHarmonicity = sk.source.harmonicityKnob.knobPos
+		sk.settingsSynth.source.volOsc = sk.source.oscVol.knobPos
+		sk.settingsSynth.source.volNoise = sk.source.noiseVol.knobPos
+		sk.settingsSynth.source.octaveOsc = sk.source.octaveSelect.octaveIndex
+
+		sk.settingsSynth.source.shapeNoise = sk.source.noise.noiseShape
+
+		sk.settingsSynth.envelopes.volAttack = sk.envVol.envSliders.envSlider_a.sliderPos
+		sk.settingsSynth.envelopes.volDecay = sk.envVol.envSliders.envSlider_d.sliderPos
+		sk.settingsSynth.envelopes.volSustain = sk.envVol.envSliders.envSlider_s.sliderPos
+		sk.settingsSynth.envelopes.volRelease = sk.envVol.envSliders.envSlider_r.sliderPos
+
+		sk.settingsSynth.envelopes.filterAttack = sk.envFilter.envSliders.envSlider_a.sliderPos
+		sk.settingsSynth.envelopes.filterDecay = sk.envFilter.envSliders.envSlider_d.sliderPos
+		sk.settingsSynth.envelopes.filterSustain = sk.envFilter.envSliders.envSlider_s.sliderPos
+		sk.settingsSynth.envelopes.filterRelease = sk.envFilter.envSliders.envSlider_r.sliderPos
+
+		sk.settingsSynth.filter.cutoff = sk.filterVis.filterKnob.knobPos
+		sk.settingsSynth.filter.resonance = sk.filterVis.filterResonanceKnob.knobPos
+		// sk.settingsSynth.filter.feedback = sk.filterVis.filterFeedbackKnob.knobPos
+		sk.settingsSynth.filter.feedback = sk.filterVis.filterEnvDepthKnob.knobPos
+
+		sk.settingsSynth.lfo.filterLfoFrequency = sk.lfo.lfo1.lfoSpeedKnob.knobPos
+		sk.settingsSynth.lfo.filterLfoTurbo = sk.lfo.lfo1.lfoTurboKnob.knobPos
+		sk.settingsSynth.lfo.filterLfoAmplitude = sk.lfo.lfo1.lfoDepthKnob.knobPos
+
+		sk.settingsSynth.lfo.volLfoFrequency = sk.lfo.lfo2.lfoSpeedKnob.knobPos
+		sk.settingsSynth.lfo.volLfoTurbo = sk.lfo.lfo2.lfoTurboKnob.knobPos
+		sk.settingsSynth.lfo.volLfoAmplitude = sk.lfo.lfo2.lfoDepthKnob.knobPos
+
+		sk.settingsSynth.lfo.filterLfoActive = sk.lfo.lfo1.lfoActive
+		sk.settingsSynth.lfo.filterLfoShape = sk.lfo.lfo1.type.shape
+		sk.settingsSynth.lfo.volLfoActive = sk.lfo.lfo2.lfoActive
+		sk.settingsSynth.lfo.volLfoShape = sk.lfo.lfo2.type.shape
+	}
+}
+
+function updateVisuals() {
+
+	for(let i = 0; i < particleSystems.length; i++) {
+
+		ps = particleSystems[i]
+		s = synthekindas[i]
+		//values--------------------------------
+		ps.life = constrain(6 * (s.filterVis.filterEnvDepthKnob.knobPos + (1 - s.filterVis.filterKnob.knobPos) + s.effects.reverb.roomsizeKnob.knobPos + s.envVol.envSliders.envSlider_s.sliderPos), 2, 30)
+		ps.lifeVar = constrain(s.source.modKnob.knobPos, .1, 1)
+
+		//quantize final position
+		ps.quantPosX = (s.synthMaster.panKnob.knobPos * (s.effects.distortion.mixKnob.knobPos + map(s.source.waveType.shape, 0, 3, 0, .4))) * .05
+		ps.quantPosY = (s.synthMaster.panKnob.knobPos * (s.effects.distortion.distortionKnob.knobPos + map(s.source.modType.shape, 0, 3, 0, .2))) * .05
+
+		//color
+		ps.hSeed = 2
+		ps.hPhase = s.source.modKnob.knobPos * .05
+		// ps.hMin = constrain(map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, 0, 255) - map((s.filterVis.filterResonanceKnob.knobPos + (1 - s.source.noiseVol.knobPos)), 0, 2, 0, 255 / 2), 0, 255)
+		// ps.hMax = constrain(map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, 0, 255) + map((s.filterVis.filterResonanceKnob.knobPos + (1 - s.source.noiseVol.knobPos)), 0, 2, 0, 255 / 2), 0, 255)
+		ps.hMin = map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, -.001, .001) - map((s.filterVis.filterResonanceKnob.knobPos), 0, 1, 0, .0003)
+		ps.hMax = map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, -.001, .001) + map((s.filterVis.filterResonanceKnob.knobPos), 0, 1, 0, .0003)
+		ps.hStep = s.lfo.lfo1.lfoDepthKnob.knobPos * .25
+		ps.hCycleSpeed = map(s.filterVis.filterResonanceKnob.knobPos, 0, 1, 0.0002, .002)
+
+		ps.sSeed = 23
+		ps.sPhase = map(s.source.modKnob.knobPos, 0, 1, .5, 5)
+		// ps.sPhase = s.source.modKnob.knobPos * .05
+		ps.sMin = (1 - s.source.noiseVol.knobPos) * 255
+		ps.sMax = s.source.oscVol.knobPos * 255
+		ps.sStep = s.lfo.lfo2.lfoDepthKnob.knobPos * .25
+
+		ps.bPhase = s.source.modKnob.knobPos + s.source.noise.noiseShape + s.effects.delay.feedbackKnob.knobPos * .05
+		ps.bMin = s.filterVis.filterEnvDepthKnob.knobPos + s.envVol.envSliders.envSlider_d.sliderPos * 255
+		ps.bMax = 130 + (s.source.oscVol.knobPos * 125)
+		ps.bStep = s.lfo.lfo2.type.shape * .1
+
+		ps.colFadeInOut = constrain(s.envVol.envSliders.envSlider_a.sliderPos * s.envFilter.envSliders.envSlider_a.sliderPos * 2, 0, 1)
+
+		//respawnPos
+		ps.initOffsetXPhase = map(s.envFilter.envSliders.envSlider_s.sliderPos, 0, 1, 0, .05)
+		ps.initOffsetXMin = -map(s.synthMaster.volKnob.knobPos, 0, 1, 1, 1.5) * width / 4
+		ps.initOffsetXMax = map(s.synthMaster.volKnob.knobPos, 0, 1, 1, 1.5) * width / 4
+		ps.initOffsetXStep = 0
+
+		ps.initOffsetYPhase = map(s.envFilter.envSliders.envSlider_s.sliderPos, 0, 1, 0, .05)
+		ps.initOffsetYMin = -map(s.synthMaster.volKnob.knobPos, 0, 1, 1, 1.5) * width / 4
+		ps.initOffsetYMax = map(s.synthMaster.volKnob.knobPos, 0, 1, 1, 1.5) * width / 4
+		ps.initOffsetYStep = 0
+
+		//directions
+		ps.dirXSpeed = s.filterVis.filterEnvDepthKnob.knobPos * .007
+		ps.dirXPhase = s.filterVis.filterKnob.knobPos + sequencer.bpmKnob.knobPos + s.effects.phaser.mixKnob.knobPos * .1
+		ps.dirXMin = -sequencer.bpmKnob.knobPos * 2
+		ps.dirXMax = sequencer.bpmKnob.knobPos * 2
+		ps.dirXStep = constrain(constrain(map(s.source.harmonicityKnob.knobPos, 0, .5, 0, .25), 0, .25) + map(s.source.modType.shape, 0, 3, 0, .5), 0, 1)
+
+		ps.dirYSpeed = s.filterVis.filterEnvDepthKnob.knobPos * .007
+		ps.dirYPhase = s.filterVis.filterKnob.knobPos + sequencer.bpmKnob.knobPos + s.effects.phaser.mixKnob.knobPos * .1
+		ps.dirYMin = -sequencer.bpmKnob.knobPos * 2
+		ps.dirYMax = sequencer.bpmKnob.knobPos * 2
+		ps.dirYStep = constrain(constrain(map(s.source.harmonicityKnob.knobPos, 0, .5, 0, .25), 0, .25) + map(s.source.waveType.shape, 0, 3, 0, .5), 0, 1)
+
+		//scale
+		ps.scalePhase = s.effects.reverb.roomsizeKnob.knobPos
+		ps.scaleMin = s.envFilter.envSliders.envSlider_s.sliderPos
+		ps.scaleMax = (s.envVol.envSliders.envSlider_s.sliderPos + .5) * 10
+		ps.scaleStep = s.effects.delay.mixKnob.knobPos * .5
+
+		//curl
+		ps.curlAmp = sequencer.bpmKnob.knobPos * 3
+		ps.curlPosxMult = s.effects.phaser.resKnob.knobPos * .02
+		ps.curlPosyMult = s.effects.vibrato.mixKnob.knobPos * .02
+		ps.curlPeriod = s.effects.delay.feedbackKnob.knobPos * .01
+		// ps.curlAmount = constrain(1 - s.filterVis.filterResonanceKnob.knobPos, 0.001, .5)
+		ps.curlAmount = map(.5 - constrain(s.filterVis.filterResonanceKnob.knobPos + s.envVol.envSliders.envSlider_a.sliderPos, 0, 1), 0, 1, .001, 1)
+		ps.curlStep = s.effects.vibrato.mixKnob.knobPos * .5
+
+		ps.envVolVal = s.synth.ampEnv.value
+		ps.envFilterVal = s.synth.filterEnv.value
+		ps.lfo1Freq = s.synth.lfo1Freq
+		ps.lfo2Freq = s.synth.lfo2Freq
+		ps.lfo1Amp = s.lfo.lfo1.lfoDepthKnob.knobPos
+		ps.lfo2Amp = s.lfo.lfo2.lfoDepthKnob.knobPos
+		ps.lfo1Dist = s.lfo.lfo1.lfoDepthKnob.knobPos * s.effects.distortion.distortionKnob.knobPos
+		ps.lfo1Filter = s.lfo.lfo1.lfoDepthKnob.knobPos * s.filterVis.filterKnob.knobPos
+		ps.lfo2Noise = s.lfo.lfo2.lfoDepthKnob.knobPos * constrain(s.source.noiseVol.knobPos * 2, 0, 1)
+	}
+}
+
+function exportData() {
+
+	updateDataSynth()
+	updateDataSequencer()
+
+	let synthData = []
+	let sequencerUnitData
+	let sequencerData
+
+	for(let sk of synthekindas) {
+		synthData.push(sk.settingsSynth)
+	}
+	sequencerUnitData = sequencer.sequencerData
+
+	let data = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: "preset1", settingsSynth: synthData, sequencer: sequencerUnitData }
+	saveJSON(data, "dataTest")
+}
+function writeUserData(){
+	updateDataSynth()
+	updateDataSequencer()
+
+	let synthData = []
+	let sequencerUnitData
+	let sequencerData
+
+	for(let sk of synthekindas) {
+		synthData.push(sk.settingsSynth)
+	}
+	sequencerUnitData = sequencer.sequencerData
+
+	let data = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: "preset1", settingsSynth: synthData, sequencer: sequencerUnitData }
+	fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption] = data
+}
+
+function loadDemoPresets(){
+	for(let i = 0; i < demoPresets.length; i++){
+		dp = demoPresets[i]
+		fileMenu.dropDownDemo.options.push(loadJSON(dp))
+	}
+}
+
+function newPreset(){
+	fileMenu.dropDownUser.options.push(loadJSON(initialize))
+}
+
+function loadUserPresets(){
+	if(localStorage.hasOwnProperty("UserPresets")){ //check if "settings" exists in localstorage
+		userData = JSON.parse(localStorage.getItem("UserPresets"))
+		for(let i = 0; i < userData.length; i++){
+			fileMenu.dropDownUser.options.push(userData[i])
+		}
+	}
+	// else{
+	// 	saveUserPreset() //create "settings" in localstorage on first load
+	// }
+}
+
+function saveUserPreset(){
+	for(let i = 0; i < userData; i++){
+		if(userData[i].name == "new"){
+			userData.splice(i, 1)
+		}
+	}
+	localStorage.setItem("UserPresets", JSON.stringify(userData))
+}
+function deleteUserPreset(){
+	userData.splice(fileMenu.dropDownUser.selectedOption, 1)
+	fileMenu.dropDownUser.options = userData
+	fileMenu.dropDownUser.selectedOption = fileMenu.dropDownUser.options.length - 1
+	saveUserPreset()
+}
+
+function importData(file) {
+	let json = file.data
+	for(let i = 0; i < json.settingsSynth.length; i++) {
+		j = json.settingsSynth[i]
+
+		synthekindas[i].settingsSynth = j
+		synthekindas[i].updateControls()
+	}
+
+	sequencer.sequencerData.sequencerSettings = json.sequencer.sequencerSettings
+	sequencer.loadData()
+	for(let i = 0; i < json.sequencer.trackData.length; i++) {
+		sa = json.sequencer.trackData[i].active
+		sn = json.sequencer.trackData[i].note
+		sc = json.sequencer.trackData[i].chord
+
+		sequencer.sequencerTracks[i].trackData.active = sa
+		sequencer.sequencerTracks[i].trackData.note = sn
+		sequencer.sequencerTracks[i].trackData.chord = sc
+		sequencer.sequencerTracks[i].loadTrackData()
+	}
+
+}
+function importPresetData(path){
+
+	let presetData = path
+	for(let i = 0; i < presetData.settingsSynth.length; i++) {
+		j = presetData.settingsSynth[i]
+		
+		synthekindas[i].settingsSynth = j
+		synthekindas[i].updateControls()
+	}
+
+	sequencer.sequencerData.sequencerSettings = presetData.sequencer.sequencerSettings
+	sequencer.loadData()
+	for(let i = 0; i < presetData.sequencer.trackData.length; i++) {
+		sa = presetData.sequencer.trackData[i].active
+		sn = presetData.sequencer.trackData[i].note
+		sc = presetData.sequencer.trackData[i].chord
+
+		sequencer.sequencerTracks[i].trackData.active = sa
+		sequencer.sequencerTracks[i].trackData.note = sn
+		sequencer.sequencerTracks[i].trackData.chord = sc
+		sequencer.sequencerTracks[i].loadTrackData()
+	}
+}
+
+function noiseSpeedy(time, seed, speed, phase, desiredMin, desiredMax, step) {
+
+	stepping = 1 / constrain(step, 0.0001, 1)
+	// noiseDetail(1, .5)
+	noiseVal = noise(((time * speed) + phase) + (seed * 4123341.1231))
+	noiseVal = round(noiseVal * stepping) / stepping
+
+	noiseVal = map(noiseVal, 0, 1, desiredMin, desiredMax)
+
+	return (noiseVal)
+}
+
+function curlNoise(time, amplitude, x, y, period, amount, step) {
+	let epsilon = amount
+
+	let n1 = noise(x + epsilon + (time * period), y + (time * period)) * amplitude
+	let n2 = noise(x - epsilon + (time * period), y + (time * period)) * amplitude
+
+	let a = (n1 - n2) / (2 * epsilon)
+
+	n1 = noise(x + (time * period), y + epsilon + (time * period)) * amplitude
+	n2 = noise(x + (time * period), y - epsilon + (time * period)) * amplitude
+
+	let b = (n1 - n2) / (2 * epsilon)
+
+	return (createVector(quantizePosition(b, step, 1), quantizePosition(-a, step, 1)))
+}
+
+function quantizePosition(input, quantVal, maxPos) {
+	quantizeVal = 1 / constrain(quantVal, .0001, 1)
+	return ((round((input / maxPos) * quantizeVal) / quantizeVal) * maxPos)
+}
+
+class ParticleSystem {
+	constructor(posx, posy, id) {
+
+		this.steps = 1
+		this.max = 100
+		this.time = 0
+
+		this.id = id 
+		this.randSeed = random(0, 5000)
+
+		this.particles = []
+
+		for(let i = 0; i < this.max; i++) {
+
+			this.initPos = createVector(sin(map(i, 0, this.max - 1, -PI, PI)) * 100, cos(map(i, 0, this.max - 1, -PI, PI)) * 100)
+
+			this.particles.push(new Particle(this.time, this.initPos, 1, color(10, 255, 255), i, random(0, .24), this.id))
+		}
+		//values--------------------------------
+		this.life
+		this.lifeVar
+
+		//quantize final position
+		this.quantPosX
+		this.quantPosY
+
+		//color
+		this.hSeed
+		this.hPhase
+		this.hMin
+		this.hMax
+		this.hStep
+		this.hCycleSpeed
+
+		this.sSeed
+		this.sPhase
+		this.sMin
+		this.sMax
+		this.sStep
+
+		this.bSeed
+		this.bPhase
+		this.bMin
+		this.bMax
+		this.bStep
+
+		this.colFadeInOut
+
+		//respawnPos
+		this.initOffsetXSeed
+		this.initOffsetXPhase
+		this.initOffsetXMin
+		this.initOffsetXMax
+		this.initOffsetXStep
+
+		this.initOffsetYSeed
+		this.initOffsetYPhase
+		this.initOffsetYMin
+		this.initOffsetYMax
+		this.initOffsetYStep
+
+		//directions
+		this.dirXSeed
+		this.dirXSpeed
+		this.dirXPhase
+		this.dirXMin
+		this.dirXMax
+		this.dirXStep
+
+		this.dirYSeed
+		this.dirYSpeed
+		this.dirYPhase
+		this.dirYMin
+		this.dirYMax
+		this.dirYStep
+
+		//scale
+		this.scaleSeed
+		this.scalePhase
+		this.scaleMin
+		this.scaleMax
+		this.scaleStep
+
+		//curl
+		this.curlAmp
+		this.curlPosxMult
+		this.curlPosyMult
+		this.curlPeriod
+		this.curlAmount
+		this.curlStep
+
+		this.envVolVal
+		this.envFilterVal
+		this.lfo1Freq
+		this.lfo2Freq
+		this.lfo1Amp
+		this.lfo2Amp
+		this.lfo1Dist
+		this.lfo2Noise
+		this.lfo1Filter
+
+		this.envAdd
+
+		//values--------------------------------
+	}
+
+	display() {
+		push()
+
+		this.time++
+
+		this.envAdd = .5 + (this.envVolVal + this.envFilterVal)
+
+		for(let i = 0; i < this.max - 1; i++) {
+
+
+			this.p = this.particles[i]
+			this.p.time = this.time
+
+			// this.p.h = noiseSpeedy(this.time, i * this.hSeed + this.id, .003, i * this.hPhase, this.hMin, this.hMax, this.hStep) + fract(this.time * this.hCycleSpeed) * 255
+			// this.p.h = fract(this.time * this.hCycleSpeed) * 255
+			this.p.h = fract((.25 * this.randSeed) + this.time * (this.hCycleSpeed + noiseSpeedy(this.time, i * this.hSeed + this.id, .003, i * this.hPhase, this.hMin, this.hMax, this.hStep))) * 255 + map(sin((this.time * (this.lfo1Freq/36))), -1, 1, -100 * this.lfo1Amp, 100 * this.lfo1Amp)
+			// this.p.h = fract(this.time * .001 + map(sin(this.time * (this.lfo1Freq / 360)), -1, 1, -this.lfo1Amp, this.lfo1Amp)) * 255 
+			this.p.s = noiseSpeedy(this.time, i + this.randSeed, .001, i * .001, 0, this.sMax * map(sin((this.time * (this.lfo2Freq/36)) * .54), -1, 1, 1 - this.lfo1Dist, 1), this.sStep)
+			// this.p.s = noiseSpeedy(this.time, i, .001, i * .001, 0, 255, 0)
+			this.p.b = noiseSpeedy(this.time, 0 + this.randSeed, .001, i * this.bPhase, this.bMin, this.bMax * map(sin((this.time * (this.lfo2Freq/36))), -1, 1, 1-this.lfo2Amp, 1), this.bStep)
+
+			this.p.initOffsetx = noiseSpeedy(this.time, 0 + this.randSeed, .001, i * this.initOffsetXPhase, -width / 4, width / 4, this.initOffsetXStep)
+			this.p.initOffsety = noiseSpeedy(this.time, 20 + this.randSeed, .001, i * this.initOffsetYPhase, -width / 4, width / 4, this.initOffsetYStep)
+
+			this.xDir = noiseSpeedy(this.time, 0 + this.randSeed, this.dirXSpeed + (i * 0.00), i * .01, this.dirXMin * this.envAdd, this.dirXMax * this.envAdd, this.dirXStep)
+			this.yDir = noiseSpeedy(this.time, 100 + this.randSeed, this.dirYSpeed + (i * 0.00), i * .01, this.dirYMin * this.envAdd, this.dirYMax * this.envAdd, this.dirYStep)
+
+			this.p.scale = noiseSpeedy(this.time, 0 + this.randSeed, .001 + (i * 0), i * this.scalePhase, this.scaleMin, this.scaleMax, this.scaleStep) * (.5 + this.envFilterVal) + map(sin((this.time * (this.lfo1Freq/40))), -1, 1, 0, 20 * this.lfo1Filter)
+
+			this.p.life = this.life
+			this.p.lifeVar = this.lifeVar
+			this.p.colFadeAmount = this.colFadeInOut
+
+			this.p.quantValx = this.quantPosX + map(sin((this.time * (this.lfo1Freq/36))), -1, 1, 0, .2 * this.lfo2Noise)
+			this.p.quantValy = this.quantPosY + map(sin((this.time * (this.lfo2Freq/36))), -1, 1, 0, .2 * this.lfo2Noise)
+
+			this.p.pos.x += this.xDir
+			this.p.pos.y += this.yDir
+			this.p.pos.add(curlNoise(this.time, this.curlAmp, this.p.pos.x * 0.005, this.p.pos.y * 0.005, 0.0001, this.curlAmount, this.curlStep))
+			this.p.display()
+		}
+		pop()
+	}
+}
+
+class Particle {
+	constructor(time, pos, scale, color, id, initLifeVar, parentId) {
+		// this.posx = posx
+		// this.posy = posy
+		this.layer
+		this.pos = pos
+		this.time = time
+		// this.initPosx = this.pos.x
+		// this.initPosy = this.pos.y
+		this.pos.x = this.initPosx
+		this.pos.y = this.initPosy
+		this.initOffsetx = 1
+		this.initOffsety = 1
+		this.scale = scale
+		this.color = color
+		this.quantVal = 0
+		this.reset = false
+		this.id = id
+		this.parentId = parentId
+		this.life = 10
+		this.lifeCounter = 0
+		this.lifeVariance = initLifeVar
+		this.lifeVar
+		this.h
+		this.s
+		this.b
+
+	}
+	display() {
+		particleRender.noStroke()
+
+		this.reset = false
+
+		if(this.time < 2) { //Initialize custom start position
+			this.reset = true
+		}
+
+		this.lifeCounter += (1 / (60 * this.life * (1 - this.lifeVariance)))
+
+		if(this.lifeCounter >= 1) {
+			this.lifeVariance = random(0, this.lifeVar)
+			this.reset = true
+			this.lifeCounter = 0
+		}
+		if(this.reset == true) {
+			this.pos.x = this.initOffsetx
+			this.pos.y = this.initOffsety
+			// this.lifeVariance = random(0, 1)
+		}
+		// this.color = color(this.h, this.s, this.b * (1-this.lifeCounter))
+		// this.color = color(this.h, this.s, this.b * ((1-this.colFadeAmount) + this.colorFadeInOut(this.lifeCounter)))
+		this.color = color(this.h, this.s, this.b, constrain((1 - this.colFadeAmount) + this.colorFadeInOut(this.lifeCounter), 0, 1) * 255)
+		particleRender.fill(this.color)
+
+		this.posxp = quantizePosition(this.pos.x, this.quantValx, 200)
+		this.posyp = quantizePosition(this.pos.y, this.quantValy, 200)
+
+		particleRender.circle(this.posxp + width / 2, this.posyp + height / 2, this.scale)
+	}
+	colorFadeInOut(input) {
+		this.inMap = map(input, 0, 1, -PI / 2, (3 * PI) / 2)
+		return (map(sin(this.inMap), -1, 1, 0, 1))
+	}
+}
+
+class Synthekinda {
+
+	constructor(posx = 0, posy = 0, id) {
+
+		this.posx = posx
+		this.posy = posy
+
+		this.synthId = id
+
+		this.noteLength = 3
+		this.length = 6
+		this.gate = false
+		this.startSwitchOsc = true
+		this.startSwitchNoise = false
+
+		this.settingsSynth = {
+			effects: {
+				reverb: {
+					room: 0,
+					damp: 1000,
+					wet: 0
+				},
+				delay: {
+					time: .55,
+					feedback: .4,
+					wet: 0
+				},
+				vibrato: {
+					frequency: 0,
+					depth: 0,
+					wet: 0
+				},
+				phaser: {
+					frequency: 0,
+					depth: 0,
+					resonance: 0,
+					baseFrequency: 100,
+					wet: 0
+				},
+				distortion: {
+					amount: 0,
+					wet: 0
+				}
+			},
+			master: {
+				volume: .5,
+				pan: .5,
+				noteLength: .5
+			},
+
+			source: {
+				shapeOsc: 1,
+				shapeMod: 3,
+				fmModIndex: 0,
+				fmHarmonicity: 0,
+				shapeNoise: 2,
+				volOsc: 1,
+				volNoise: 0,
+				octaveOsc: 0
+			},
+			envelopes: {
+				volAttack: .01,
+				volDecay: .125,
+				volSustain: .2,
+				volRelease: .25,
+
+				filterAttack: .025,
+				filterDecay: .4,
+				filterSustain: .1,
+				filterRelease: .4
+			},
+			filter: {
+				cutoff: .5,
+				resonance: 0,
+				feedback: .5
+			},
+			lfo: {
+				filterLfoFrequency: 0.075,
+				filterLfoTurbo: 0,
+				filterLfoAmplitude: 0,
+				filterLfoActive: true,
+				filterLfoShape: 0,
+
+				volLfoFrequency: .2,
+				volLfoTurbo: 0,
+				volLfoAmplitude: 0,
+				volLfoActive: false,
+				volLfoShape: 1,
+			}
+		}
+
+		fill(globalWhite)
+		textSize(fontSize * (standardUnit / 60))
+
+
+		this.synth = new SynthAudio()
+
+		this.source = new Source(this.posx, this.posy - spacingV * 2.6, scaleUniv, scaleUniv, "source")
+
+		this.filterVis = new FilterVis(this.posx, this.posy - spacingV, scaleUniv, scaleUniv, "Filter (Make it smooth)")
+
+		this.envFilter = new EnvelopeDraw(this.posx, this.posy, scaleUniv, scaleUniv, "Filter Envelope (wahwah)", this.noteLengthFilter, length, color(255, 255, 0))
+
+		this.lfo = new LFO(this.posx, this.posy + spacingV, scaleUniv, scaleUniv)
+
+		this.envVol = new EnvelopeDraw(this.posx, this.posy + spacingV * 2, scaleUniv, scaleUniv, "Volume Envelope (wAH wAH)", this.noteLengthVol, length, color(255, 100, 80))
+
+		this.synthMaster = new SynthMaster(this.posx, this.posy + spacingV * 3, scaleUniv, scaleUniv)
+
+		this.effects = new Effects(this.posx + standardUnit * 7, this.posy + spacingV * 3, scaleUniv, scaleUniv)
+
+		//set settings
+		this.updateControls()
+	}
+
+	display() {
+
+		this.globalWhite = 255 - map(sin(frameCount * .1), -1, 1, 0, 20)
+
+		//–––––––––––––––––––––––––––effects––––––––––––––––––––
+
+
+		//values to cache"""""""""""""""""""""""""""""""""""
+		this.synth.reverbRoom = map(this.effects.reverb.roomsizeKnob.knobVal, 0, 1, 0, .95)
+		this.synth.reverbDamp = map(this.effects.reverb.dampKnob.knobVal, 0, 1, 100, 1000)
+		this.synth.reverbWET = this.effects.reverb.mixKnob.knobVal
+
+		this.synth.delayTime = this.effects.delay.delayTimeStepped
+		this.synth.delayFB = map(this.effects.delay.feedbackKnob.knobVal, 0, 1, 0, .98)
+		this.synth.delayWET = this.effects.delay.mixKnob.knobVal
+
+		this.synth.vibratoFreq = map(this.effects.vibrato.freqKnob.knobVal, 0, 1, 0, 20)
+		this.synth.vibratoDepth = map(this.effects.vibrato.depthKnob.knobVal, 0, 1, 0, 1)
+		this.synth.vibratoWET = this.effects.vibrato.mixKnob.knobVal
+
+		this.synth.phaserFreq = map(this.effects.phaser.freqKnob.knobVal, 0, 1, 0, 6)
+		this.synth.phaserDepth = map(this.effects.phaser.depthKnob.knobVal, 0, 1, 0, 3)
+		this.synth.phaserRes = map(this.effects.phaser.resKnob.knobVal, 0, 1, 1, 12)
+		this.synth.phaserWET = this.effects.phaser.mixKnob.knobVal
+
+		this.synth.distortionAmount = this.effects.distortion.distortionKnob.knobVal
+		this.synth.distortionWET = this.effects.distortion.mixKnob.knobVal
+		//"""""""""""""""""""""""""""""""""""
+
+		//–––––––––––––––––––––––––––master controls––––––––––––––––––––
+
+
+		//values to cache"""""""""""""""""""""""""""""""""""
+		this.volKnobMap = sqrt(1 - pow(this.synthMaster.volKnob.knobVal - 1, 2)) //ease volKnob
+		this.synth.pan = map(this.synthMaster.panKnob.knobVal, 0, 1, -1, 1)
+		//"""""""""""""""""""""""""""""""""""
+
+		this.masterVolControl = map(this.volKnobMap, 0, 1, 60, 0)
+		this.synth.noteLengthFilter = map(this.envFilter.noteLengthKnob.knobPos, 0, 1, .5, 5)
+		this.synth.noteLengthVol = map(this.envVol.noteLengthKnob.knobPos, 0, 1, .5, 5)
+		this.synth.noteLengthFilter = map(this.envFilter.noteLengthKnob.knobPos, 0, 1, .5, 5)
+
+		//–––––––––––––––––––––––––––source controls––––––––––––––––––––
+
+
+		//values to cache"""""""""""""""""""""""""""""""""""
+		this.synth.osc.type = this.synth.shapes[this.source.waveType.shape]
+		this.synth.osc.modulationType = this.synth.shapes[this.source.modType.shape]
+		this.synth.FMmodIndex = map(this.source.modKnob.knobVal, 0, 1, 0, 4)
+		this.synth.FMharmonicity = map(this.source.harmonicityKnob.knobVal, 0, 1, 1, 1.5)
+		this.synth.noise.type = this.synth.noiseShapes[this.source.noise.noiseShape]
+		this.oscVolKnobEase = sqrt(1 - pow(this.source.oscVol.knobVal - 1, 2)) //ease volKnob
+		this.noiseVolKnobEase = sqrt(1 - pow(this.source.noiseVol.knobVal - 1, 2)) //ease volKnob
+		//"""""""""""""""""""""""""""""""""""
+
+		this.synth.oscVolume = map(this.oscVolKnobEase, 0, 1, -80, -24) - this.masterVolControl
+		this.synth.noiseVolume = map(this.noiseVolKnobEase, 0, 1, -80, -24) - this.masterVolControl
+
+		//–––––––––––––––––––––––––––envelopes––––––––––––––––––––
+
+		if(this.synthId == synthIndex || loadBuffer < 1) {
+			this.envVol.display()
+			this.envFilter.display()
+		}
+		// this.envVol.noteLength = this.noteLength
+		// this.envFilter.noteLength = this.noteLength
+
+		//values to cache"""""""""""""""""""""""""""""""""""
+		this.synth.av = this.envVol.envSliders.a
+		this.synth.dv = this.envVol.envSliders.d
+		this.synth.sv = this.envVol.envSliders.s
+		this.synth.rv = this.envVol.envSliders.r
+
+		this.synth.af = this.envFilter.envSliders.a
+		this.synth.df = this.envFilter.envSliders.d
+		this.synth.sf = this.envFilter.envSliders.s
+		this.synth.rf = this.envFilter.envSliders.r
+		//"""""""""""""""""""""""""""""""""""
+
+
+		//–––––––––––––––––––––––––––filter––––––––––––––––––––
+
+		//values to cache"""""""""""""""""""""""""""""""""""
+		this.filterKnobEase = pow(this.filterVis.filterKnob.knobVal, 2)
+		this.filter = map(this.filterKnobEase, 0, 1, 2, 2000)
+		this.filterResonance = map(this.filterVis.filterResonanceKnob.knobVal, 0, 1, 0, 40)
+		// this.filterFeedback = map(this.filterVis.filterFeedbackKnob.knobVal, 0, 1, 0, 1)
+		this.synth.filterEnvDepth = map(this.filterVis.filterEnvDepthKnob.knobVal, 0, 1, 0, 8)
+		//"""""""""""""""""""""""""""""""""""
+
+		this.cutoffEnvVal = this.synth.filterEnv.value
+		this.filterVis.cutoff = map(this.filter, 0, 2000, 0, 5 * standardUnit) + (map(this.cutoffEnvVal, 0, 1, 0, 30) * this.filterVis.filterEnvDepthKnob.knobVal * 2)
+
+		this.synth.filterFeedback = this.filterFeedback
+		this.synth.filterFreq = this.filter
+		this.synth.filterRes = this.filterResonance
+
+		//–––––––––––––––––––––––––––lfo––––––––––––––––––––
+
+
+		//values to cache"""""""""""""""""""""""""""""""""""
+		this.synth.lfo1Freq = this.lfo.lfo1freq
+		this.synth.lfo2Freq = this.lfo.lfo2freq
+		this.synth.lfo1.amplitude.value = this.lfo.lfo1.lfoDepthKnob.knobVal
+		this.synth.lfo2.amplitude.value = this.lfo.lfo2.lfoDepthKnob.knobVal
+
+		if(this.lfo.lfo1.lfoActive == true) {
+			this.synth.lfo1.type = this.synth.shapes[this.lfo.lfo1.type.shape]
+		}
+		if(this.lfo.lfo2.lfoActive == true) {
+			this.synth.lfo2.type = this.synth.shapes[this.lfo.lfo2.type.shape]
+		}
+		//"""""""""""""""""""""""""""""""""""
+
+		//–––––––––––––––––––––––––––audio render––––––––––––––––––––
+
+		if(this.synthId == synthIndex || loadBuffer < 1) {
+			this.effects.display()
+			this.synthMaster.display()
+			this.source.display()
+			this.filterVis.display()
+			this.lfo.display()
+		}
+
+		this.synth.octave = this.source.octaveSelect.octave
+		this.synth.gate = this.gate
+		this.envFilter.gate = this.gate
+		this.envVol.gate = this.gate
+		this.synthMaster.waveFormDraw.waveData = this.synth.waveData
+		this.synth.display()
+
+		//–––––––––––––––––––––––––––waveForm––––––––––––––––––––
+
+		if(this.synthId == synthIndex || loadBuffer < 1) {
+			push()
+			noFill()
+			stroke(globalWhite)
+
+			strokeCap(SQUARE)
+			circle(this.posx + standardUnit * 1.75, this.posy - standardUnit * 4, standardUnit * .5)
+			strokeWeight(2)
+			circle(this.posx + standardUnit * 1.75, this.posy - standardUnit * 4, standardUnit * .15)
+			push()
+			beginShape()
+
+			vertex(this.posx + standardUnit * 1.75, this.posy - standardUnit * 4)
+			vertex(this.posx - standardUnit + curveUnit, this.posy - standardUnit * 4)
+			bezierVertex(this.posx - standardUnit + curveUnit * .5, this.posy - standardUnit * 4,
+				this.posx - standardUnit, this.posy - standardUnit * 4 + curveUnit * .5,
+				this.posx - standardUnit, this.posy - standardUnit * 4 + curveUnit)
+
+			vertex(this.posx - standardUnit, this.posy - standardUnit * 2.35 - curveUnit)
+			bezierVertex(this.posx - standardUnit, this.posy - standardUnit * 2.35 - curveUnit * .5,
+				this.posx - standardUnit + curveUnit * .5, this.posy - standardUnit * 2.35,
+				this.posx - standardUnit + curveUnit, this.posy - standardUnit * 2.35)
+
+			vertex(this.posx - standardUnit * .2, this.posy - standardUnit * 2.35)
+			vertex(this.posx - standardUnit + curveUnit, this.posy - standardUnit * 2.35)
+
+			bezierVertex(this.posx - standardUnit + curveUnit * .5, this.posy - standardUnit * 2.35,
+				this.posx - standardUnit, this.posy - standardUnit * 2.35 + curveUnit * .5,
+				this.posx - standardUnit, this.posy - standardUnit * 2.35 + curveUnit)
+
+			vertex(this.posx - standardUnit, this.posy + standardUnit * 3.65 - curveUnit)
+			bezierVertex(this.posx - standardUnit, this.posy + standardUnit * 3.65 - curveUnit * .5,
+				this.posx - standardUnit + curveUnit * .5, this.posy + standardUnit * 3.65,
+				this.posx - standardUnit + curveUnit, this.posy + standardUnit * 3.65)
+
+			vertex(this.posx - standardUnit * .2, this.posy + standardUnit * 3.65)
+			vertex(this.posx - standardUnit + curveUnit, this.posy + standardUnit * 3.65)
+
+			bezierVertex(this.posx - standardUnit + curveUnit * .5, this.posy + standardUnit * 3.65,
+				this.posx - standardUnit, this.posy + standardUnit * 3.65 + curveUnit * .5,
+				this.posx - standardUnit, this.posy + standardUnit * 3.65 + curveUnit)
+
+			vertex(this.posx - standardUnit, this.posy + standardUnit * 6.85 - curveUnit)
+			bezierVertex(this.posx - standardUnit, this.posy + standardUnit * 6.85 - curveUnit * .5,
+				this.posx - standardUnit + curveUnit * .5, this.posy + standardUnit * 6.85,
+				this.posx - standardUnit + curveUnit, this.posy + standardUnit * 6.85)
+
+			vertex(this.posx + standardUnit * 3.9 - curveUnit, this.posy + standardUnit * 6.85)
+			bezierVertex(this.posx + standardUnit * 3.9 - curveUnit * .5, this.posy + standardUnit * 6.85,
+				this.posx + standardUnit * 3.9, this.posy + standardUnit * 6.85 - curveUnit * .5,
+				this.posx + standardUnit * 3.9, this.posy + standardUnit * 6.85 - curveUnit)
+			vertex(this.posx + standardUnit * 3.9, this.posy + standardUnit * 6.3)
+			endShape()
+			fill(globalWhite)
+			triangle(this.posx + standardUnit * .6, this.posy - standardUnit * 4 + curveUnit * .2,
+				this.posx + standardUnit * .6, this.posy - standardUnit * 4 - curveUnit * .2,
+				this.posx + standardUnit * .4, this.posy - standardUnit * 4)
+			triangle(this.posx - standardUnit, this.posy + standardUnit * 1.55,
+				this.posx - standardUnit - curveUnit * .2, this.posy + standardUnit * 1.35,
+				this.posx - standardUnit + curveUnit * .2, this.posy + standardUnit * 1.35)
+			triangle(this.posx - standardUnit, this.posy + standardUnit * 5.4,
+				this.posx - standardUnit - curveUnit * .2, this.posy + standardUnit * 5.2,
+				this.posx - standardUnit + curveUnit * .2, this.posy + standardUnit * 5.2)
+			pop()
+			push()
+			beginShape()
+			if(this.lfo.lfoSelect.lfoIndex == 0) {
+				stroke(globalWhite)
+			} else {
+				stroke(130)
+			}
+			vertex(this.posx - standardUnit * .8, this.posy - standardUnit * .4 - curveUnit)
+			vertex(this.posx - standardUnit * .8, this.posy - standardUnit * .2 - curveUnit * .5)
+
+			bezierVertex(this.posx - standardUnit * .8, this.posy - standardUnit * .2 - curveUnit * .25,
+				this.posx - standardUnit * .8 + curveUnit * .25, this.posy - standardUnit * .2,
+				this.posx - standardUnit * .8 + curveUnit * .5, this.posy - standardUnit * .2)
+
+			bezierVertex(this.posx - standardUnit * .8 + curveUnit * .75, this.posy - standardUnit * .2,
+				this.posx - standardUnit * .8 + curveUnit * .9, this.posy - standardUnit * .2 + curveUnit * .25,
+				this.posx - standardUnit * .8 + curveUnit * .9, this.posy - standardUnit * .2 + curveUnit * .5)
+
+			vertex(this.posx - standardUnit * .8 + curveUnit * .9, this.posy + standardUnit * .98)
+
+
+			endShape()
+			if(this.lfo.lfoSelect.lfoIndex == 0) {
+				fill(globalWhite)
+			} else {
+				fill(130)
+			}
+			triangle(this.posx - standardUnit * .8 + curveUnit * .9, this.posy + standardUnit * .5,
+				this.posx - standardUnit * .8 + curveUnit * .7, this.posy + standardUnit * .7,
+				this.posx - standardUnit * .8 + curveUnit * 1.1, this.posy + standardUnit * .7)
+
+			pop()
+
+			push()
+			beginShape()
+			if(this.lfo.lfoSelect.lfoIndex == 1) {
+				stroke(globalWhite)
+			} else {
+				stroke(130)
+			}
+
+			vertex(this.posx - standardUnit * .22, this.posy + standardUnit * 3.25 + curveUnit * .5)
+			vertex(this.posx - standardUnit * .8 + curveUnit * .5, this.posy + standardUnit * 3.25 + curveUnit * .5)
+			bezierVertex(this.posx - standardUnit * .8 + curveUnit * .25, this.posy + standardUnit * 3.25 + curveUnit * .5,
+				this.posx - standardUnit * .8, this.posy + standardUnit * 3.25 + curveUnit * .25,
+				this.posx - standardUnit * .8, this.posy + standardUnit * 3.25)
+			vertex(this.posx - standardUnit * .8, this.posy + standardUnit * 2.68 + curveUnit * .5)
+
+			bezierVertex(this.posx - standardUnit * .8, this.posy + standardUnit * 2.68 + curveUnit * .25,
+				this.posx - standardUnit * .8 + curveUnit * .25, this.posy + standardUnit * 2.68,
+				this.posx - standardUnit * .8 + curveUnit * .5, this.posy + standardUnit * 2.68)
+
+			bezierVertex(this.posx - standardUnit * .8 + curveUnit * .75, this.posy + standardUnit * 2.68,
+				this.posx - standardUnit * .8 + curveUnit * .9, this.posy + standardUnit * 2.68 - curveUnit * .25,
+				this.posx - standardUnit * .8 + curveUnit * .9, this.posy + standardUnit * 2.68 - curveUnit * .5)
+
+			vertex(this.posx - standardUnit * .8 + curveUnit * .9, this.posy + standardUnit * 1.86)
+
+
+			endShape()
+			if(this.lfo.lfoSelect.lfoIndex == 1) {
+				fill(globalWhite)
+			} else {
+				fill(130)
+			}
+			triangle(this.posx - standardUnit * .8 + curveUnit * .9, this.posy + standardUnit * 2.37,
+				this.posx - standardUnit * .8 + curveUnit * .7, this.posy + standardUnit * 2.17,
+				this.posx - standardUnit * .8 + curveUnit * 1.1, this.posy + standardUnit * 2.17)
+			pop()
+
+			push()
+			beginShape()
+			stroke(globalWhite)
+			vertex(this.posx - standardUnit * .2, this.posy - standardUnit * 2.15)
+			vertex(this.posx - standardUnit * .8 + curveUnit, this.posy - standardUnit * 2.15)
+
+			bezierVertex(this.posx - standardUnit * .8 + curveUnit * .5, this.posy - standardUnit * 2.15,
+				this.posx - standardUnit * .8, this.posy - standardUnit * 2.15 + curveUnit * .5,
+				this.posx - standardUnit * .8, this.posy - standardUnit * 2.15 + curveUnit)
+
+			vertex(this.posx - standardUnit * .8, this.posy - standardUnit * .4 - curveUnit)
+			bezierVertex(this.posx - standardUnit * .8, this.posy - standardUnit * .4 - curveUnit * .5,
+				this.posx - standardUnit * .8 + curveUnit * .5, this.posy - standardUnit * .4,
+				this.posx - standardUnit * .8 + curveUnit, this.posy - standardUnit * .4)
+
+			vertex(this.posx - standardUnit * .2, this.posy - standardUnit * .4)
+			endShape()
+			fill(globalWhite)
+			triangle(this.posx - standardUnit * .8 - curveUnit * .2, this.posy - standardUnit * 1.2,
+				this.posx - standardUnit * .8, this.posy - standardUnit * 1.4,
+				this.posx - standardUnit * .8 + curveUnit * .2, this.posy - standardUnit * 1.2)
+			pop()
+			pop()
+		}
+	}
+
+	updateControls() {
+
+		//set settings
+		this.effects.reverb.roomsizeKnob.knobPos = this.settingsSynth.effects.reverb.room
+		this.effects.reverb.mixKnob.knobPos = this.settingsSynth.effects.reverb.wet
+
+		this.effects.delay.delayTimeKnob.knobPos = this.settingsSynth.effects.delay.time
+		this.effects.delay.feedbackKnob.knobPos = this.settingsSynth.effects.delay.feedback
+		this.effects.delay.mixKnob.knobPos = this.settingsSynth.effects.delay.wet
+
+		this.effects.vibrato.freqKnob.knobPos = this.settingsSynth.effects.vibrato.frequency
+		this.effects.vibrato.depthKnob.knobPos = this.settingsSynth.effects.vibrato.depth
+		this.effects.vibrato.mixKnob.knobPos = this.settingsSynth.effects.vibrato.wet
+
+		this.effects.phaser.freqKnob.knobPos = this.settingsSynth.effects.phaser.frequency
+		this.effects.phaser.depthKnob.knobPos = this.settingsSynth.effects.phaser.depth
+		this.effects.phaser.resKnob.knobPos = this.settingsSynth.effects.phaser.resonance
+		this.effects.phaser.mixKnob.knobPos = this.settingsSynth.effects.phaser.wet
+
+		this.effects.distortion.distortionKnob.knobPos = this.settingsSynth.effects.distortion.amount
+		this.effects.distortion.mixKnob.knobPos = this.settingsSynth.effects.distortion.wet
+
+		this.synthMaster.volKnob.knobPos = this.settingsSynth.master.volume
+		this.synthMaster.panKnob.knobPos = this.settingsSynth.master.pan
+		sequencer.sequencerTracks[this.synthId].noteLengthKnob.knobPos = this.settingsSynth.master.noteLength
+
+		this.source.waveType.shape = this.settingsSynth.source.shapeOsc
+		this.source.modType.shape = this.settingsSynth.source.shapeMod
+		this.source.modKnob.knobPos = this.settingsSynth.source.fmModIndex
+		this.source.harmonicityKnob.knobPos = this.settingsSynth.source.fmHarmonicity
+		this.source.oscVol.knobPos = this.settingsSynth.source.volOsc
+		this.source.noiseVol.knobPos = this.settingsSynth.source.volNoise
+		this.source.octaveSelect.octaveIndex = this.settingsSynth.source.octaveOsc
+
+		this.source.noise.noiseShape = this.settingsSynth.source.shapeNoise
+
+		this.envVol.envSliders.envSlider_a.sliderPos = this.settingsSynth.envelopes.volAttack
+		this.envVol.envSliders.envSlider_d.sliderPos = this.settingsSynth.envelopes.volDecay
+		this.envVol.envSliders.envSlider_s.sliderPos = this.settingsSynth.envelopes.volSustain
+		this.envVol.envSliders.envSlider_r.sliderPos = this.settingsSynth.envelopes.volRelease
+
+		this.envFilter.envSliders.envSlider_a.sliderPos = this.settingsSynth.envelopes.filterAttack
+		this.envFilter.envSliders.envSlider_d.sliderPos = this.settingsSynth.envelopes.filterDecay
+		this.envFilter.envSliders.envSlider_s.sliderPos = this.settingsSynth.envelopes.filterSustain
+		this.envFilter.envSliders.envSlider_r.sliderPos = this.settingsSynth.envelopes.filterRelease
+
+
+		this.filterVis.filterKnob.knobPos = this.settingsSynth.filter.cutoff
+		this.filterVis.filterResonanceKnob.knobPos = this.settingsSynth.filter.resonance
+		this.filterVis.filterEnvDepthKnob.knobPos = this.settingsSynth.filter.feedback
+
+
+		this.lfo.lfo1.lfoSpeedKnob.knobPos = this.settingsSynth.lfo.filterLfoFrequency
+		this.lfo.lfo1.lfoTurboKnob.knobPos = this.settingsSynth.lfo.filterLfoTurbo
+		this.lfo.lfo1.lfoDepthKnob.knobPos = this.settingsSynth.lfo.filterLfoAmplitude
+
+		this.lfo.lfo2.lfoSpeedKnob.knobPos = this.settingsSynth.lfo.volLfoFrequency
+		this.lfo.lfo2.lfoTurboKnob.knobPos = this.settingsSynth.lfo.volLfoTurbo
+		this.lfo.lfo2.lfoDepthKnob.knobPos = this.settingsSynth.lfo.volLfoAmplitude
+
+		this.lfo.lfo1.lfoActive = this.settingsSynth.lfo.filterLfoActive
+		this.lfo.lfo1.type.shape = this.settingsSynth.lfo.filterLfoShape
+		this.lfo.lfo2.lfoActive = this.settingsSynth.lfo.volLfoActive
+		this.lfo.lfo2.type.shape = this.settingsSynth.lfo.volLfoShape
+	}
+}
+
+class SynthAudio {
+
+	constructor(av = .01, dv = 1, sv = .5, rv = .8,
+		af = .01, df = 3, sf = .1, rf = .1, f = 100) {
+
+		this.av = av
+		this.dv = dv
+		this.sv = sv
+		this.rv = rv
+
+		this.af = af
+		this.df = df
+		this.sf = sf
+		this.rf = rf
+
+		this.lfo1Depth = 0
+		this.lfo1Freq = 2
+		this.lfo2Depth = 0
+		this.lfo2Freq = 2
+
+		this.shapes = ["sine", "triangle", "sawtooth", "square"]
+		this.noiseShapes = ["white", "pink", "brown"]
+
+		this.filterFreq = 1000
+		this.filterRes = 0
+		this.filterEnvDepth = 0
+		this.noteLenght = this.noteLength
+
+		this.freq = f
+		this.freq2 = f
+		this.freq3 = f
+		this.octave = 1
+		this.chordMode = 0
+		this.pan = 0
+
+		this.masterVolume
+		this.oscVolume
+		this.noiseVolume
+		this.FMmodIndex
+		this.FMharmonicity
+
+		this.reverbRoom
+		this.reverbDamp
+		this.reverbWET
+
+		this.delayTime
+		this.delayFB
+		this.delayWET
+
+		this.vibratoFreq
+		this.vibratoDepth
+		this.vibratoWET
+
+		this.phaserFreq
+		this.phaserDepth
+		this.phaserRes
+		this.phaserWET
+
+		this.distortionAmount
+		this.distortionWET
+
+		//–––––––––––––––––––––––––––effects––––––––––––––––––––
+		this.reverb = new Tone.Freeverb({
+			roomSize: 0,
+			dampening: 1000,
+			wet: 0
+		})
+		this.delay = new Tone.FeedbackDelay({
+			delayTime: 0,
+			feedback: 0,
+			wet: 0
+		})
+		this.phaser = new Tone.Phaser({
+			frequency: 0,
+			octaves: 0,
+			Q: 0,
+			wet: 0
+		})
+		this.vibrato = new Tone.Vibrato({
+			frequency: 0,
+			depth: 0,
+			type: this.shapes[0],
+			wet: 0
+		})
+		this.distortion = new Tone.Distortion({
+			distortion: 0,
+			wet: 0
+		})
+		this.distortionNoise = new Tone.Distortion({
+			distortion: 0,
+			wet: 0
+		})
+
+		//–––––––––––––––––––––––––––sources––––––––––––––––––––
+		this.volOsc = new Tone.Volume(-24)
+		this.volOsc2 = new Tone.Volume(-24)
+		this.volOsc3 = new Tone.Volume(-24)
+
+		this.osc = new Tone.FMOscillator({
+			frequency: 0,
+			type: this.shapes[0],
+			modulationType: this.shapes[1],
+			harmonicity: 1,
+			modulationIndex: 1,
+			phase: 1
+		})
+		this.osc2 = new Tone.FMOscillator({
+			frequency: 0,
+			type: this.shapes[0],
+			modulationType: this.shapes[1],
+			harmonicity: 1,
+			modulationIndex: 1,
+			phase: 1
+		})
+		this.osc3 = new Tone.FMOscillator({
+			frequency: 0,
+			type: this.shapes[0],
+			modulationType: this.shapes[1],
+			harmonicity: 1,
+			modulationIndex: 1,
+			phase: 1
+		})
+
+		this.noise = new Tone.Noise({
+			type: this.noiseShapes[0]
+		})
+		this.volNoise = new Tone.Volume(-24)
+
+		//–––––––––––––––––––––––––––envelopes––––––––––––––––––––
+		this.ampEnv = new Tone.AmplitudeEnvelope({
+			attack: this.av,
+			decay: this.dv,
+			sustain: this.sv,
+			release: this.rv
+		})
+		this.filterEnv = new Tone.FrequencyEnvelope({
+			attack: this.af,
+			decay: this.df,
+			sustain: this.sf,
+			release: this.rf,
+			baseFrequency: this.filterFreq,
+			octaves: 4,
+		})
+		this.feedback = new Tone.FeedbackCombFilter({
+			delayTime: 1,
+			resonance: .95,
+		})
+		this.feedbackNoise = new Tone.FeedbackCombFilter({
+			delayTime: 0.01,
+			resonance: 0
+		})
+
+		this.ampEnv.attackCurve = "linear"
+		this.ampEnv.decayCurve = "linear"
+		this.ampEnv.releaseCurve = "exponential"
+
+		this.filterEnv.attackCurve = "linear"
+		this.filterEnv.decayCurve = "linear"
+		this.filterEnv.releaseCurve = "exponential"
+
+		//–––––––––––––––––––––––––––filter––––––––––––––––––––
+		this.filter = new Tone.Filter({
+			frequency: this.filterFreq,
+			type: "lowpass",
+			roloff: -24,
+			Q: 0
+		})
+
+		//–––––––––––––––––––––––––––lfos––––––––––––––––––––
+		this.lfo1 = new Tone.LFO({
+			type: "sine",
+			min: 0,
+			max: 0,
+			phase: 0,
+			frequency: 3,
+			amplitude: 1,
+		})
+		this.lfo2 = new Tone.LFO({
+			type: "sine",
+			min: 0,
+			max: 0,
+			phase: 0,
+			frequency: 3,
+			amplitude: 1,
+		})
+		this.lfo1.start()
+		this.lfo2.start()
+
+		//–––––––––––––––––––––––––––other––––––––––––––––––––
+		this.panning = new Tone.Panner(this.pan)
+		this.limiter = new Tone.Limiter(-24)
+		this.comp = new Tone.Compressor(-30, 20)
+
+		//–––––––––––––––––––––––––––signal chain––––––––––––––––––––
+		this.lfo1.connect(this.filter.frequency)
+		this.filterEnv.connect(this.filter.frequency)
+
+		this.lfo2.connect(this.osc.volume)
+		this.lfo2.connect(this.noise.volume)
+		this.noise.chain(this.distortionNoise, this.volNoise, this.filter, this.ampEnv) //masterVol to volEnv
+		this.osc.chain(this.volOsc, this.filter, this.ampEnv)
+		this.osc2.chain(this.volOsc2, this.filter, this.ampEnv) //need seperate dists for all
+		this.osc3.chain(this.volOsc3, this.filter, this.ampEnv)
+
+		this.ampEnv.chain(this.distortion, this.vibrato, this.phaser, this.reverb, this.delay, this.comp, this.limiter, this.panning, Tone.Destination)
+		//–––––––––––––––––––––––––––post––––––––––––––––––––
+		this.waveForm = new Tone.Waveform({
+			size: 64,
+		})
+		this.waveData = []
+		this.limiter.connect(this.waveForm)
+		this.osc.start()
+		this.osc2.start()
+		this.osc3.start()
+		this.noise.start()
+	}
+
+	display() {
+		//–––––––––––––––––––––––––––val osc––––––––––––––––––––
+		this.osc.modulationIndex.value = this.FMmodIndex
+		this.osc.harmonicity.value = this.FMharmonicity
+
+		this.volOsc.volume.value = this.oscVolume
+		// this.volOsc2.volume.value = this.oscVolume
+		// this.volOsc3.volume.value = this.oscVolume
+		this.volNoise.volume.value = this.noiseVolume
+		this.panning.pan.value = this.pan
+
+		//–––––––––––––––––––––––––––val envelopes––––––––––––––––––––
+		this.ampEnv.attack = this.av
+		this.ampEnv.decay = this.dv
+		this.ampEnv.sustain = this.sv
+		this.ampEnv.release = this.rv
+
+		this.filterEnv.attack = this.af
+		this.filterEnv.decay = this.df
+		this.filterEnv.sustain = this.sf
+		this.filterEnv.release = this.rf
+		this.filterEnv.octaves = this.filterEnvDepth
+
+		//–––––––––––––––––––––––––––val lfos––––––––––––––––––––
+		this.lfo1.min = constrain(this.filterFreq - (this.filterFreq * 8), 2, 2000)
+		this.lfo1.max = this.filterFreq + (this.filterFreq * 8)
+		this.lfo1.frequency.value = this.lfo1Freq
+
+		this.lfo2.min = -120
+		this.lfo2.max = 0
+		this.lfo2.frequency.value = this.lfo2Freq
+
+		//–––––––––––––––––––––––––––val filter––––––––––––––––––––
+		this.filter.Q.value = this.filterRes
+		// this.feedbackNoise.resonance.value = this.filterFeedback
+		// this.feedbackNoise.delayTime.rampTo(1 / this.freq, 0)
+		// this.feedback.resonance.value = this.filterFeedback
+		// this.feedback.delayTime.rampTo(1 / this.freq, 0)
+		this.filter.frequency.value = this.filterFreq
+		this.filterEnv.baseFrequency = this.freq
+
+		//–––––––––––––––––––––––––––val effects––––––––––––––––––––
+		this.reverb.roomSize.value = this.reverbRoom
+		this.reverb.wet.value = this.reverbWET
+
+		this.delay.delayTime.value = this.delayTime
+		this.delay.feedback.value = this.delayFB
+		this.delay.wet.value = this.delayWET
+
+		this.vibrato.frequency.value = this.vibratoFreq
+		this.vibrato.depth.value = this.vibratoDepth
+		this.vibrato.wet.value = this.vibratoWET
+
+		this.phaser.frequency.value = this.phaserFreq
+		this.phaser.octaves = this.phaserDepth
+		this.phaser.Q.value = this.phaserRes
+		this.phaser.wet.value = this.phaserWET
+		this.phaser.baseFrequency = this.freq + 1 //OFFSET = PHASE
+
+		this.distortion.distortion = this.distortionAmount
+		this.distortion.wet.value = this.distortionWET
+		this.distortionNoise.distortion = this.distortionAmount
+		this.distortionNoise.wet.value = this.distortionWET
+
+		
+		if(this.chordMode == 0) {
+			// this.osc2.mute = true
+			// this.osc3.mute = true
+			this.volOsc2.volume.rampTo(-240, .01)
+			this.volOsc3.volume.rampTo(-240, .01)
+		} else {
+			// this.osc2.mute = false
+			// this.osc3.mute = false
+			this.volOsc2.volume.rampTo(this.oscVolume, .01)
+			this.volOsc3.volume.rampTo(this.oscVolume, .01)
+		}
+		// this.osc2.frequency.value = this.freq2 * this.octave
+		// this.osc3.frequency.value = this.freq3 * this.octave
+		this.osc.frequency.rampTo(this.freq * this.octave, 0.01)
+		this.osc2.frequency.rampTo(this.freq2 * this.octave, 0.01)
+		this.osc3.frequency.rampTo(this.freq3 * this.octave, 0.01)
+
+		//–––––––––––––––––––––––––––GATE––––––––––––––––––––
+
+		if(this.gate) {
+			this.lfo1.stop()
+			this.lfo1.start()
+			this.filterEnv.triggerAttackRelease(this.noteLengthFilter)
+			this.ampEnv.triggerAttackRelease(this.noteLengthVol)
+		}
+
+		//–––––––––––––––––––––––––––update audioWave––––––––––––––––––––
+		this.waveData = this.waveForm.getValue()
+	}
+}
+
+//ENVELOPE-CLASSES--------------------------------------------------------------------
+
+class EnvelopeDraw {
+
+	constructor(posx, posy, sizew, sizeh, label, noteLength, hold, color, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.color = color
+		this.gate = false
+
+		this.sizew = sizew
+		this.sizeh = sizeh
+
+		this.val = 0
+
+		this.noteLength = noteLength
+
+		this.sustaincount = 0
+		this.sustaincountv = this.sustaincount
+
+		this.attack = false
+		this.attackv = this.attack
+
+		this.x = 0
+		this.yv = 0
+
+		this.hold = hold
+
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+
+		this.envSliders = new EnvSliderMenu(this.posx + standardUnit * 3.5, this.posy - standardUnit * .2, scaleUniv)
+		this.noteLengthKnob = new Knob(this.posx + standardUnit * 6, this.posy - standardUnit * .3, 1, 1, "HOLD", 0.5)
+
+	}
+
+
+	display() {
+
+		push()
+
+		this.envSliders.display()
+		this.noteLengthKnob.display()
+		this.noteLength = map(this.noteLengthKnob.knobPos, 0, 1, .5, 5)
+
+		translate(this.posx, this.posy)
+		drawingContext.setLineDash([])
+		this.atime = this.envSliders.a
+		this.dtime = this.envSliders.d
+		this.sustain = this.envSliders.s
+		this.rtime = this.envSliders.r
+
+		push()
+		noStroke()
+		this.color.setAlpha(40)
+		fill(this.color)
+		rect(0, 0, this.noteLength * standardUnit * this.sizew, -(standardUnit * 1.6) * this.sizeh)
+		this.color.setAlpha(255)
+		stroke(this.color)
+		line(this.noteLength * standardUnit * this.sizew, 0, this.noteLength * standardUnit * this.sizew, -(standardUnit * 1.6) * this.sizeh)
+		pop()
+
+		push()
+		text(this.label, 0, (-standardUnit * 2.2) * this.sizeh)
+		noFill()
+		stroke(globalWhite)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 6) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+		noStroke()
+		pop()
+
+		drawingContext.setLineDash([5, 5])
+		this.stime = constrain(this.noteLength - (this.atime + this.dtime), 0, this.noteLength)
+
+		//timeline lines
+		for(let i = 0; i < this.hold; i++) {
+			stroke(160)
+			strokeWeight(1)
+			line(i * standardUnit * this.sizew, 0, i * standardUnit * this.sizew, -(standardUnit * 1.6) * this.sizeh)
+			this.t = str(i)
+			fill(globalWhite)
+			noStroke()
+			text(this.t, i * standardUnit * this.sizew, (standardUnit * .4) * this.sizeh)
+		}
+
+		if(this.gate) {
+			this.visGate = true
+			this.attack = true
+			this.trigswitch = true
+			this.x = 0
+			this.val = 0
+			this.sustaincount = 0
+		}
+
+		this.valv = 0
+		this.sustaincountv = 0
+		strokeWeight(1.5)
+		this.attackv = true
+
+		drawingContext.setLineDash([]);
+		beginShape()
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1.5)
+
+		//curve static
+		vertex(0, 0)
+		vertex(this.atime * ((standardUnit / 60) * 60) * this.sizew, -(standardUnit * 1.6) * this.sizeh)
+		vertex((this.atime + this.dtime) * ((standardUnit / 60) * 60) * this.sizew, -(standardUnit * 1.6) * this.sizeh * this.sustain)
+		vertex((this.atime + this.dtime + this.stime) * ((standardUnit / 60) * 60) * this.sizew, -(standardUnit * 1.6) * this.sizeh * this.sustain)
+		vertex((this.atime + this.dtime + this.stime + this.rtime) * ((standardUnit / 60) * 60) * this.sizew, 0)
+		endShape()
+
+		stroke(globalWhite)
+		strokeWeight(5)
+
+		//curve follow
+		if(this.visGate) {
+			if(this.x < standardUnit * (this.hold - 1)) {
+				this.x += standardUnit / 60
+			}
+			if(this.attack) {
+				this.val += 1 / (60 * this.atime)
+			}
+			if(this.val >= 1) {
+				this.attack = false
+			}
+			if(this.attack == false && this.val > this.sustain && this.dtime > 0) {
+				this.val -= (1 - this.sustain) / (60 * this.dtime)
+				this.val = constrain(this.val, this.sustain - .001, 1)
+			}
+			if(this.attack == false && this.dtime == 0 && this.sustaincount < this.stime) {
+				this.val = this.sustain
+				this.sustaincount += 1 / 60
+			}
+			if(this.attack == false && this.val < this.sustain) {
+				this.sustaincount += 1 / 60
+			}
+			if(this.sustaincount > this.stime) {
+				this.val -= this.sustain / (60 * this.rtime)
+			}
+			this.val = constrain(this.val, 0, 1)
+		}
+		this.y = map(this.val, 0, 1, 0, (standardUnit * 1.6))
+		point(this.x * this.sizew, -this.y * this.sizeh)
+
+		strokeWeight(1)
+
+		drawingContext.setLineDash([]);
+		line(this.x * this.sizew, 0, this.x * this.sizew, -(standardUnit * 1.6) * this.sizeh)
+
+		pop()
+	}
+}
+
+class EnvSliderMenu {
+	constructor(posx, posy, scale, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.posx = posx
+		this.posy = posy
+
+		this.scale = scale
+
+		this.envSlider_a = new EnvSlider(0 + this.posx, this.posy, this.scale, this.scale, "attack!", this.a, 0, 2)
+		this.envSlider_d = new EnvSlider(0 + this.posx + spacingSlid, this.posy, this.scale, this.scale, "attack!", this.d, 0, 2)
+		this.envSlider_s = new EnvSlider(0 + this.posx + spacingSlid * 2, this.posy, this.scale, this.scale, "attack!", this.s, 0, 1)
+		this.envSlider_r = new EnvSlider(0 + this.posx + spacingSlid * 3, this.posy, this.scale, this.scale, "attack!", this.r, 0, 3)
+	}
+	display() {
+		textAlign(CENTER)
+		push()
+		translate(this.posx, this.posy + standardUnit * .45)
+		rotate(-PI * .2)
+		text("attack", 0, 0)
+		pop()
+		push()
+		translate(this.posx + spacingSlid * .88, this.posy + standardUnit * .35)
+		rotate(PI * .1)
+		text("decay", 0, 0)
+		pop()
+		push()
+		translate(this.posx + spacingSlid * 2, this.posy + standardUnit * .45)
+		text("sustain", 0, 0)
+		pop()
+		push()
+		translate(this.posx + spacingSlid * 3.2, this.posy + standardUnit * .55)
+		rotate(PI * .1)
+		text("release", 0, 0)
+		pop()
+		textAlign(LEFT)
+
+		this.envSlider_a.display()
+		this.a = map(this.envSlider_a.sliderVal, 0, 1, .01, 2)
+		this.envSlider_d.display()
+		this.d = map(this.envSlider_d.sliderVal, 0, 1, .01, 2)
+		this.envSlider_s.display()
+		this.s = map(this.envSlider_s.sliderVal, 0, 1, 0, 1)
+		this.envSlider_r.display()
+		this.r = map(this.envSlider_r.sliderVal, 0, 1, .01, 3)
+	}
+}
+
+class EnvSlider {
+
+	constructor(posx, posy, sizew, sizeh, label, defaultVal, min, max, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+		this.min = min
+		this.max = max
+		this.defaultVal
+		this.sliderPos
+		this.sliderVal
+
+	}
+
+	display() {
+
+		push()
+		translate(this.posx, this.posy)
+
+		drawingContext.setLineDash([]);
+
+		if(mouseDown) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, -this.sliderPos * (standardUnit * 1.6) * this.sizeh) < ((standardUnit * .5) * this.sizew)) {
+				this.slidActive = true
+				this.deltaMouse = 0
+			}
+		}
+		if(mouseUp == true) {
+			this.slidActive = false
+		}
+		if(this.slidActive) {
+			this.sliderPos = -(mouseY - height / 2 - this.posy) / ((standardUnit * 1.6) * this.sizeh)
+		}
+
+
+		noFill()
+		stroke(globalWhite)
+		push()
+		drawingContext.setLineDash([5, 5]);
+		line(0, 0, 0, -(standardUnit * 1.6) * this.sizeh)
+		pop()
+
+		for(let i = 0; i < 5; i++) {
+			line(-5 * this.sizew, -((standardUnit * 1.6) / 4) * this.sizeh * i, 5 * this.sizew, -((standardUnit * 1.6) / 4) * this.sizeh * i)
+		}
+		push()
+		rectMode(CENTER)
+		fill(globalWhite)
+		this.sliderPos = constrain(this.sliderPos, 0, 1)
+
+		rect(0, -this.sliderPos * (standardUnit * 1.6) * this.sizeh, (standardUnit * .5) * this.sizew, (standardUnit * .15) * this.sizeh)
+
+		pop()
+		// this.sliderVal = map(this.sliderPos, -(standardUnit * 1.6) * this.sizeh, 0, 1, 0)
+		this.sliderVal = this.sliderPos
+		pop()
+
+	}
+}
+
+//FILTER-CLASSES--------------------------------------------------------------------
+
+class FilterVis {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+		this.cutoff = cutoff
+		this.filterKnob = new Knob(this.posx + (standardUnit * 7) * this.sizew, this.posy - (standardUnit * .5) * this.sizeh, 1.5, 1.5, "CUTOFF!", 0.5)
+		this.filterResonanceKnob = new Knob(this.posx + (standardUnit * 9.3) * this.sizew, this.posy - (standardUnit * .05) * this.sizeh, 1.2, 1.2, "RESONANCE!", 0)
+		// this.filterFeedbackKnob = new Knob(this.posx + (standardUnit * 11.5) * this.sizew, this.posy - (standardUnit * .65) * this.sizeh, 1.2, 1.2, "FEEDBACK!", PI)
+		this.filterEnvDepthKnob = new Knob(this.posx + (standardUnit * 11.5) * this.sizew, this.posy - (standardUnit * .65) * this.sizeh, 1.2, 1.2, "ENVELOPE", 0.5)
+	}
+
+	display() {
+
+		push()
+		this.filterKnob.display()
+		this.filterResonanceKnob.display()
+		this.filterEnvDepthKnob.display()
+		translate(this.posx, this.posy)
+		drawingContext.setLineDash([]);
+		text(this.label, 0, -(standardUnit * 2.2) * this.sizeh)
+		noFill()
+		stroke(globalWhite)
+
+		rect(-(standardUnit * .4) * this.sizew, (standardUnit * .6) * this.sizeh, (standardUnit * 6) * this.sizew, -(standardUnit * 2.5) * this.sizeh)
+
+		beginShape()
+		strokeWeight(1)
+		stroke(255, 255, 0)
+		vertex(0, -(standardUnit * 1.6) * this.sizeh)
+		vertex(constrain((this.cutoff - (standardUnit * .6)) * this.sizew, 0, 5 * standardUnit * this.sizew), -(standardUnit * 1.6) * this.sizeh)
+		bezierVertex(constrain(this.cutoff * this.sizew, 0, 5 * standardUnit * this.sizew), -(standardUnit * 1.6) * this.sizeh,
+			constrain(this.cutoff * this.sizew, 0, 5 * standardUnit * this.sizew), 0,
+			constrain((this.cutoff + (standardUnit * .6)) * this.sizew, 0, 5 * standardUnit * this.sizew), 0)
+		vertex(5 * standardUnit * this.sizew, 0)
+		endShape()
+
+		beginShape()
+		noStroke()
+		fill(255, 255, 0, 40)
+		vertex(0, -(standardUnit * 1.6) * this.sizeh)
+		vertex(constrain((this.cutoff - (standardUnit * .6)) * this.sizew, 0, 5 * standardUnit * this.sizew), -(standardUnit * 1.6) * this.sizeh)
+		bezierVertex(constrain(this.cutoff * this.sizew, 0, 5 * standardUnit * this.sizew), -(standardUnit * 1.6) * this.sizeh,
+			constrain(this.cutoff * this.sizew, 0, 5 * standardUnit * this.sizew), 0,
+			constrain((this.cutoff + (standardUnit * .6)) * this.sizew, 0, 5 * standardUnit * this.sizew), 0)
+		vertex(5 * standardUnit * this.sizew, 0)
+		vertex(0, 0)
+		endShape()
+
+		drawingContext.setLineDash([5, 5]);
+
+		for(let i = 0; i < 6; i++) {
+			stroke(160)
+			strokeWeight(1)
+			line(i * standardUnit * this.sizew, 0, i * standardUnit * this.sizew, -(standardUnit * 1.6) * this.sizeh)
+		}
+		noStroke()
+		fill(globalWhite)
+		textAlign(LEFT)
+		text("0Hz", 0, (standardUnit * .38) * this.sizeh)
+		textAlign(RIGHT)
+		text("5000Hz", 5 * standardUnit * this.sizew, (standardUnit * .38) * this.sizeh)
+		textAlign(LEFT)
+		pop()
+	}
+}
+
+//UI-ETC-CLASS--------------------------------------------------------------------
+
+class Knob {
+
+	constructor(posx, posy, sizew, sizeh, label, defaultPos, brightness = 1, quantize) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+
+		this.defaultPos = defaultPos
+
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+		this.labelVal = ""
+		// this.knobPos = 0 - this.defaultPos
+		this.knobPos = 0.5
+		this.knobActive = false
+
+		this.offsetx = 10
+		this.offsety = 10
+
+		this.mouse = mouseY
+		this.mouseOld = mouseY
+		this.deltaMouse = 0
+
+		this.knobMinMax = 3 * (PI / 4)
+		this.knobVal = 0
+		this.label = str(label)
+
+		this.quantize = 0
+
+	}
+
+
+	display() {
+
+		push()
+		translate(this.posx, this.posy)
+
+		if(mouseDown) {
+			if(dist(mouseX - width / 2, mouseY - height / 2, this.posx, this.posy) < ((standardUnit * .35) * this.sizew)) {
+				this.knobActive = true
+				this.deltaMouse = 0
+				knobActive = true
+			}
+		}
+		if(mouseUp == true) {
+			this.knobActive = false
+			knobActive = false
+		}
+
+		textAlign(CENTER)
+		fill(globalWhite)
+		text(this.label, 0, -(standardUnit * .34) * this.sizew)
+		text(this.labelVal, 0, (standardUnit * .45) * this.sizew)
+
+		stroke(globalWhite)
+		noFill()
+
+		this.mouse = mouseY
+		this.deltaMouse = this.mouse - this.mouseOld
+
+		if(this.knobActive) {
+			this.knobPos -= this.deltaMouse * .007
+		}
+		if(this.knobActive == true && doubleClicked == true){
+			this.knobPos = this.defaultPos
+		}
+
+		this.mouseOld = mouseY
+
+		fill(0)
+		circle(0, 0, ((standardUnit * .5)) * this.sizew)
+
+		this.knobPos = constrain(this.knobPos, 0, 1)
+		this.knobPosMapped = map(quantizePosition(this.knobPos, this.quantize, 1), 0, 1, -this.knobMinMax, this.knobMinMax)
+		rotate(this.knobPosMapped)
+		push()
+		drawingContext.setLineDash([5, 5]);
+		circle(0, 0, (standardUnit * .4) * this.sizew)
+		strokeWeight(5)
+		drawingContext.setLineDash([]);
+		line(0, 0, 0, -(standardUnit * .25) * this.sizew)
+		pop()
+		pop()
+
+		this.knobVal = quantizePosition(this.knobPos, this.quantize, 1)
+	}
+}
+
+
+class WaveType {
+
+	constructor(posx, posy, sizew, sizeh, label, defaultWav, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2.6) * this.sizew
+
+		this.label = label
+
+		this.default
+
+		this.unit = this.widthPx / 11
+
+		this.sineWave = new Sine(0, 0, this.unit)
+		this.triangleWave = new Triangle(0, 0, this.unit)
+		this.sawWave = new Saw(0, 0, this.unit)
+		this.squareWave = new Square(0, 0, this.unit)
+
+		if(this.default == 0) {
+			this.sineWave = new Sine(0, 0, this.unit, 1)
+		}
+		if(this.default == 1) {
+			this.triangleWave = new Triangle(0, 0, this.unit, 1)
+		}
+		if(this.default == 2) {
+			this.sawWave = new Saw(0, 0, this.unit, 1)
+		}
+		if(this.default == 3) {
+			this.squareWave = new Square(0, 0, this.unit, 1)
+		}
+		this.shape = defaultWav
+
+	}
+
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		textAlign(CENTER)
+		fill(globalWhite)
+		text(this.label, this.widthPx * .5, -this.widthPx - standardUnit * .1)
+		fill(0)
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(0, 0, this.widthPx, -this.widthPx)
+		this.sineWave.display()
+		this.triangleWave.display()
+		this.sawWave.display()
+		this.squareWave.display()
+		if(mouseDown) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.unit * 3, -this.unit * 8) < this.unit * 2) {
+				this.shape = 0
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.unit * 8, -this.unit * 8) < this.unit * 2) {
+				this.shape = 1
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.unit * 3, -this.unit * 3) < this.unit * 2) {
+				this.shape = 2
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.unit * 8, -this.unit * 3) < this.unit * 2) {
+				this.shape = 3
+			}
+		}
+		if(this.shape == 0) {
+			this.sineWave.select = true
+			this.triangleWave.select = false
+			this.sawWave.select = false
+			this.squareWave.select = false
+		}
+		if(this.shape == 1) {
+			this.sineWave.select = false
+			this.triangleWave.select = true
+			this.sawWave.select = false
+			this.squareWave.select = false
+		}
+		if(this.shape == 2) {
+			this.sineWave.select = false
+			this.triangleWave.select = false
+			this.sawWave.select = true
+			this.squareWave.select = false
+		}
+		if(this.shape == 3) {
+			this.sineWave.select = false
+			this.triangleWave.select = false
+			this.sawWave.select = false
+			this.squareWave.select = true
+		}
+		pop()
+	}
+
+}
+
+class Saw {
+	constructor(posx, posy, unit, select = false) {
+		this.posx = posx
+		this.posy = posy
+		this.unit = unit
+		this.select = select
+
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		fill(0)
+		strokeWeight(1)
+		if(this.select == true){
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.unit, -this.unit, this.unit * 4, -this.unit * 4)
+		blendMode(DIFFERENCE)
+		noFill()
+
+		beginShape()
+		vertex(this.unit, -this.unit * 3)
+		vertex(this.unit * 2, -this.unit * 2)
+		vertex(this.unit * 2, -this.unit * 4)
+		vertex(this.unit * 4, -this.unit * 2)
+		vertex(this.unit * 4, -this.unit * 4)
+		vertex(this.unit * 5, -this.unit * 3)
+		endShape()
+		if(this.select == false){
+			blendMode(BLEND)
+			stroke(255)
+			rect(this.unit, -this.unit, this.unit * 4, -this.unit * 4)
+		}
+		pop()
+	}
+}
+
+class Sine {
+	constructor(posx, posy, unit, select = false) {
+		this.posx = posx
+		this.posy = posy
+		this.unit = unit
+		this.select = select
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		fill(0)
+		strokeWeight(1)
+		if(this.select == true){
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.unit, -this.unit * 6, this.unit * 4, -this.unit * 4)
+		blendMode(DIFFERENCE)
+		noFill()
+		beginShape()
+		vertex(this.unit, -this.unit * 9)
+		bezierVertex(this.unit * 2, -this.unit * 9,
+		this.unit * 2, -this.unit * 7,
+		this.unit * 3, -this.unit * 7)
+		bezierVertex(this.unit * 4, -this.unit * 7,
+		this.unit * 4, -this.unit * 9,
+		this.unit * 5, -this.unit * 9)
+		endShape()
+		if(this.select == false){
+			blendMode(BLEND)
+			stroke(255)
+			rect(this.unit, -this.unit * 6, this.unit * 4, -this.unit * 4)
+		}
+		pop()
+	}
+}
+
+class Triangle {
+	constructor(posx, posy, unit, select = false) {
+		this.posx = posx
+		this.posy = posy
+		this.unit = unit
+		this.select = select
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		fill(0)
+		strokeWeight(1)
+		if(this.select == true){
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.unit * 6, -this.unit * 6, this.unit * 4, -this.unit * 4)
+		blendMode(DIFFERENCE)
+		noFill()
+
+		beginShape()
+		vertex(this.unit * 6, -this.unit * 7)
+		vertex(this.unit * 8, -this.unit * 9)
+		vertex(this.unit * 10, -this.unit * 7)
+		endShape()
+		if(this.select == false){
+			blendMode(BLEND)
+			stroke(255)
+			rect(this.unit * 6, -this.unit * 6, this.unit * 4, -this.unit * 4)
+		}
+		pop()
+	}
+}
+
+class Square {
+	constructor(posx, posy, unit, select = false) {
+		this.posx = posx
+		this.posy = posy
+		this.unit = unit
+		this.select = select
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		fill(0)
+		strokeWeight(1)
+		if(this.select == true){
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.unit * 6, -this.unit, this.unit * 4, -this.unit * 4)
+		blendMode(DIFFERENCE)
+		noFill()
+		beginShape()
+		vertex(this.unit * 6, -this.unit * 2)
+		vertex(this.unit * 7, -this.unit * 2)
+		vertex(this.unit * 7, -this.unit * 4)
+		vertex(this.unit * 9, -this.unit * 4)
+		vertex(this.unit * 9, -this.unit * 2)
+		vertex(this.unit * 10, -this.unit * 2)
+		endShape()
+		if(this.select == false){
+			blendMode(BLEND)
+			stroke(255)
+			rect(this.unit * 6, -this.unit, this.unit * 4, -this.unit * 4)
+		}
+		pop()
+	}
+}
+
+//LFO-CLASSES--------------------------------------------------------------------
+
+class LFO {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+
+		this.shape1 = 0
+		this.shape2 = 0
+
+		this.lfoSelect = new LFOselect(this.posx, this.posy, 1, 1)
+		// this.lfo1 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble wobble)", synthekinda1.settingsSynth.lfo.filterLfoShape)
+		// this.lfo2 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble wobble)", synthekinda1.settingsSynth.lfo.volLfoShape)
+		this.lfo1 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble)", 0)
+		this.lfo2 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble)", 0)
+
+	}
+
+	display() {
+		if(this.lfoSelect.lfoIndex == 0) {
+			this.lfo1.display()
+		}
+		if(this.lfoSelect.lfoIndex == 1) {
+			this.lfo2.display()
+		}
+		this.lfoSelect.display()
+
+		this.lfo1freq = this.lfo1.frequency
+		this.lfo2freq = this.lfo2.frequency
+
+		if(this.lfo1.lfoActive == true) {
+			this.lfo1shape = this.lfo1.type.shape
+		}
+		if(this.lfo2.lfoActive == true) {
+			this.lfo2shape = this.lfo2.type.shape
+		}
+
+		this.lfo1amp = this.lfo1.lfoDepthKnob.knobVal
+		this.lfo2amp = this.lfo2.lfoDepthKnob.knobVal
+	}
+}
+
+class LFOselect {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+
+		this.lfoIndex = 0
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		textAlign(CENTER)
+		noFill()
+		strokeWeight(1)
+		stroke(globalWhite)
+		if(mouseDown) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, -standardUnit * .45, -standardUnit * .7) < standardUnit * .2 * this.sizeh) {
+				this.lfoIndex = 0
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, -standardUnit * .45, -standardUnit * .25) < standardUnit * .2 * this.sizeh) {
+				this.lfoIndex = 1
+			}
+		}
+
+		push()
+		if(this.lfoIndex == 0) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(-standardUnit * .25, -standardUnit * .6, -standardUnit * .4 * this.sizew, -standardUnit * .4 * this.sizeh)
+		pop()
+		push()
+		if(this.lfoIndex == 1) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(-standardUnit * .25, -standardUnit * .15, -standardUnit * .4 * this.sizew, -standardUnit * .4 * this.sizeh)
+		pop()
+
+		blendMode(DIFFERENCE)
+		fill(255)
+		noStroke()
+		textSize(12 * this.sizew)
+		text(1, -standardUnit * .45, -standardUnit * .7)
+		text(2, -standardUnit * .45, -standardUnit * .25)
+		pop()
+	}
+}
+
+class LFOVis {
+
+	constructor(posx, posy, sizew, sizeh, label, waveType, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+
+		this.defaultShape = 0
+
+		this.waveType = this.defaultShape
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+		this.cutoff = cutoff
+		this.vertPos = this.posy
+		this.speed = 0
+		this.frequency = 1
+		this.depth = 1
+		this.depthOffset
+		this.lfoTurbo = 1
+		this.baseSpeed
+		this.lockedSteps = [1/(16*3), (1/32)*1.5, 1/16, 1/(8*3), (1/16)*1.5, 1/8, 1/(4*3), (1/8)*1.5, 1/4, 1/(2*3), (1/4)*1.5, 1/2, 1/(1*3), (1/2)*1.5, 1/1]
+		this.lockedStepNames = ["1/1", "1/2dot", "1/1tri", "1/2", "1/4dot", "1/2trip", "1/4", "1/8dot", "1/4trip", "1/8", "1/16dot", "1/8trip", "1/16", "1/32dot", "1/16trip"]
+
+		this.type = new WaveType(this.posx + (standardUnit * 4) * this.sizew, this.posy + ((standardUnit * .6) * this.sizeh), this.sizew * .8, this.sizeh, "SHAPE", this.waveType)
+		this.lfoSpeedKnob = new Knob(this.posx + (standardUnit * 7.5) * this.sizew, this.posy, 1.2, 1, "SPEED!", 0)
+		this.lfoSpeedKnob.quantize = 1/(this.lockedSteps.length-1)
+		this.lfoDepthKnob = new Knob(this.posx + (standardUnit * 9) * this.sizew, this.posy - (standardUnit * 1.3) * this.sizeh, 1.2, 1, "DEPTH!", 0)
+		this.lfoTurboKnob = new Knob(this.posx + (standardUnit * 10.5) * this.sizew, this.posy, 1.2, 1, "TURBO!", 0)
+	}
+
+	display() {
+
+		this.depthOffset = ((((standardUnit * 1.6) * this.sizeh) / 2) * this.depth)
+		this.lfoTurboKnob.display()
+		this.lfoTurbo = map(this.lfoTurboKnob.knobVal, 0, 1, 1, 2.5)
+
+		this.lfoSpeedKnob.display()
+		this.baseSpeed = bpm/(60/(this.lockedSteps[(this.lfoSpeedKnob.knobVal) * (this.lockedSteps.length-1)]))
+		this.lfoSpeedKnob.labelVal = this.lockedStepNames[(this.lfoSpeedKnob.knobVal) * (this.lockedSteps.length-1)]
+		this.lfoSpeed = map(this.baseSpeed, 0, 1, 0, 20 * this.lfoTurbo)
+		this.lfoDepthKnob.display()
+
+		this.lfoActive = false
+
+		this.depth = 1 - this.lfoDepthKnob.knobVal
+		this.frequency = this.lfoSpeed
+		this.speed += (this.frequency / 60) //hz with 60 fps
+		push()
+		drawingContext.setLineDash([]);
+		noStroke()
+		fill(globalWhite)
+		text(this.label, this.posx, this.posy - (standardUnit * 2.2) * this.sizeh)
+		noFill()
+		stroke(globalWhite)
+
+		// this.type.shape = this.defaultShape
+
+		beginShape()
+		strokeWeight(1)
+		stroke(10, 255, 160)
+		if(this.type.shape == 0) {
+			//Sine
+			for(let i = 0; i < 3; i++) {
+				bezier(this.posx + (standardUnit * i + standardUnit * 0) - (standardUnit * 1 * fract(this.speed)), this.posy - (standardUnit * 1.6) * this.sizeh + this.depthOffset,
+					this.posx + (standardUnit * i + standardUnit * 0.25) - (standardUnit * 1 * fract(this.speed)), this.posy - (standardUnit * 1.6) * this.sizeh + this.depthOffset,
+					this.posx + (standardUnit * i + standardUnit * .25) - (standardUnit * 1 * fract(this.speed)), this.posy - this.depthOffset,
+					this.posx + (standardUnit * i + standardUnit * .5) - (standardUnit * 1 * fract(this.speed)), this.posy - this.depthOffset)
+				bezier(this.posx + (standardUnit * i + standardUnit * .5) - (standardUnit * 1 * fract(this.speed)), this.posy - this.depthOffset,
+					this.posx + (standardUnit * i + standardUnit * .75) - (standardUnit * 1 * fract(this.speed)), this.posy - this.depthOffset,
+					this.posx + (standardUnit * i + standardUnit * .75) - (standardUnit * 1 * fract(this.speed)), this.posy - (standardUnit * 1.6) * this.sizeh + this.depthOffset,
+					this.posx + (standardUnit * i + standardUnit * 1) - (standardUnit * 1 * fract(this.speed)), this.posy - (standardUnit * 1.6) * this.sizeh + this.depthOffset)
+			}
+			this.lfoActive = true
+		}
+		if(this.type.shape == 1) {
+			// triangle
+			for(let i = 0; i < 6; i++) {
+				if(i % 2 == 0) {
+					this.vertPos = this.posy - (standardUnit * 1.6) * this.sizeh + this.depthOffset
+				} else {
+					this.vertPos = this.posy - this.depthOffset
+				}
+				vertex(this.posx + (standardUnit * .5 * (i)) - (standardUnit * 1 * fract(this.speed)), this.vertPos)
+			}
+			this.lfoActive = true
+		}
+		if(this.type.shape == 2) {
+			// saw
+			for(let i = 0; i < 6; i++) {
+				if(i % 2 == 0) {
+					this.vertPos = this.posy - (standardUnit * 1.6) * this.sizeh + this.depthOffset
+				} else {
+					this.vertPos = this.posy - this.depthOffset
+				}
+				vertex(this.posx + (standardUnit * 1 * (round(i * .5))) - (standardUnit * 1 * fract(this.speed)), this.vertPos)
+			}
+			this.lfoActive = true
+		}
+		if(this.type.shape == 3) {
+			// square
+			for(let i = 0; i < 12; i++) {
+				if(floor(i * .5) % 2 == 0) {
+					this.vertPos = this.posy - (standardUnit * 1.6) * this.sizeh + this.depthOffset
+				} else {
+					this.vertPos = this.posy - this.depthOffset
+				}
+				vertex(this.posx + (standardUnit * .5 * (round(i * .5))) - (standardUnit * 1 * fract(this.speed)), this.vertPos)
+			}
+			this.lfoActive = true
+		}
+		endShape()
+		drawingContext.setLineDash([5, 5]);
+
+		for(let i = 0; i < 4; i++) {
+			stroke(160)
+			strokeWeight(1)
+			line(this.posx + i * standardUnit * this.sizew, this.posy, this.posx + i * standardUnit * this.sizew, this.posy - (standardUnit * 1.6) * this.sizeh)
+		}
+		push()
+		noStroke()
+		fill(0)
+		erase()
+		rect(this.posx, this.posy + 2, -(standardUnit * 2.1) * this.sizew, -(standardUnit * 2) * this.sizeh)
+		rect(this.posx + (standardUnit * 3) * this.sizew, this.posy + 2, (standardUnit * 3) * this.sizew, -(standardUnit * 2) * this.sizeh)
+		noErase()
+		pop()
+		drawingContext.setLineDash([]);
+		stroke(globalWhite)
+		rect(this.posx - ((standardUnit * .4) * this.sizew), this.posy + ((standardUnit * .6) * this.sizeh), (standardUnit * 4) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+		fill(globalWhite)
+		pop()
+
+		this.type.display()
+	}
+}
+
+//WAVEFORM-CLASS--------------------------------------------------------------------
+
+class WaveFormDraw {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+		this.waveData = []
+	}
+
+	display() {
+
+		push()
+		stroke(globalWhite)
+		translate(this.posx, this.posy)
+		drawingContext.setLineDash([5, 5]);
+		line(0, 0, 0, -(standardUnit * 1.6) * this.sizeh)
+		line((standardUnit * 3.5) * this.sizeh, 0, (standardUnit * 3.5) * this.sizeh, -(standardUnit * 1.6) * this.sizeh)
+		drawingContext.setLineDash([]);
+		noFill()
+		strokeWeight(2)
+		push()
+		beginShape()
+		stroke(0, 255, 220)
+		for(let i = 0; i < this.waveData.length; i++) {
+			this.waveDataLengthMapped = map(i, 0, this.waveData.length, 0, (standardUnit * 3.5) * this.sizeh)
+			vertex(this.waveDataLengthMapped, constrain(-standardUnit * .35 - (this.waveData[i] * standardUnit * 6), -(standardUnit * 1.6) * this.sizeh, 0))
+		}
+		endShape()
+		pop()
+		strokeWeight(1)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 4.3) * this.sizew, -(standardUnit * 2.5) * this.sizeh)
+		pop()
+	}
+}
+
+//MASTER-CLASSES--------------------------------------------------------------------
+
+class SynthMaster {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = 1) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+		this.volKnob = new Knob(this.posx + standardUnit * 1.7, this.posy - standardUnit * .15, 2, 2, "SYNTH VOLUME", .5)
+		this.panKnob = new Knob(this.posx + standardUnit * .3, this.posy - standardUnit * .2, 1.5, 2, "SYNTH PAN", 0.5)
+		this.waveFormDraw = new WaveFormDraw(this.posx + standardUnit * 3, this.posy, scaleUniv, scaleUniv, "SYNTH VOLUME")
+
+	}
+	display() {
+		this.volKnob.display()
+		this.panKnob.display()
+		this.waveFormDraw.display()
+	}
+}
+
+class Source {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = 1) {
+
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posy = posy
+		this.posx = posx
+		this.label = label
+
+		// this.waveType = new WaveType(this.posx, this.posy, scaleUniv, scaleUniv, "SOURCE", synthekinda1.settingsSynth.source.shapeOsc, 1)
+		this.waveType = new WaveType(this.posx, this.posy, scaleUniv, scaleUniv, "SOURCE", 2, 1)
+		this.octaveSelect = new OctaveSelect(this.posx - standardUnit * .6, this.posy - standardUnit, scaleUniv, scaleUniv)
+		// this.modType = new WaveType(this.posx + standardUnit * 3, this.posy, scaleUniv, scaleUniv, "NASTIFY", synthekinda1.settingsSynth.source.shapeMod, 1)
+		this.modType = new WaveType(this.posx + standardUnit * 3, this.posy, scaleUniv, scaleUniv, "NASTIFY", 2, 1)
+		this.harmonicityKnob = new Knob(this.posx + standardUnit * 2.15, this.posy, 1.3, 1.3, "harmonize", 0, 0)
+		this.modKnob = new Knob(this.posx + standardUnit * 2.15, this.posy - standardUnit * 1.1, 1.3, 1.3, "Mod it!", 0, 0)
+
+		this.noise = new Noise(this.posx + standardUnit * 5, this.posy, scaleUniv, scaleUniv, "NOISE", 1)
+
+		this.oscVol = new Knob(this.posx + standardUnit * 3.15, this.posy + standardUnit * 1.1, 1.5, 1.5, "Melody", 1, 1)
+		this.noiseVol = new Knob(this.posx + standardUnit * 4.15, this.posy + standardUnit * 1.1, 1.5, 1.5, "Noise", 0, 1)
+
+	}
+	display() {
+
+		this.noiseVol.display()
+		this.oscVol.display()
+
+		this.waveType.display()
+		this.octaveSelect.display()
+		this.modType.display()
+		this.harmonicityKnob.display()
+		this.modKnob.display()
+
+		this.noise.display()
+
+	}
+}
+
+class Noise {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+
+		// this.noiseShape = synthekinda1.settingsSynth.source.shapeNoise
+		this.noiseShape = 2
+
+		this.label = label
+		this.noisePos = []
+		for(let i = 0; i < 20; i++) {
+			this.noisePos.push(random(-this.widthPx / 12 * 4, -this.widthPx / 12 * 8))
+		}
+	}
+
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		textAlign(CENTER)
+
+		noFill()
+		stroke(globalWhite)
+		rect(0, 0, this.widthPx, -this.widthPx)
+		strokeWeight(2)
+		rect(this.widthPx / 12, -this.widthPx / 12, this.widthPx / 12 * 10, -this.widthPx / 12 * 10)
+		beginShape()
+		for(let i = 0; i < 20; i++) {
+			let iMapped = map(i, 0, 19, this.widthPx / 12, this.widthPx / 12 * 11)
+			vertex(iMapped, this.noisePos[i])
+		}
+		endShape()
+		if(mouseDown) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.widthPx / 12 * 6, this.widthPx / 12 * 2.5) < this.widthPx / 12 * 2.5) {
+				this.noiseShape = 0
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.widthPx / 12 * 6, this.widthPx / 12 * 9.5) < this.widthPx / 12 * 2.5) {
+				this.noiseShape = 1
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.widthPx / 12 * 6, this.widthPx / 12 * 15.5) < this.widthPx / 12 * 2.5) {
+				this.noiseShape = 2
+			}
+		}
+		strokeWeight(1)
+		push()
+		if(this.noiseShape == 0) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.widthPx / 12, this.widthPx / 12, this.widthPx / 12 * 10, this.widthPx / 12 * 5)
+		pop()
+		push()
+		if(this.noiseShape == 1) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.widthPx / 12, this.widthPx / 12 * 7, this.widthPx / 12 * 10, this.widthPx / 12 * 5)
+		pop()
+		push()
+		if(this.noiseShape == 2) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.widthPx / 12, this.widthPx / 12 * 13, this.widthPx / 12 * 10, this.widthPx / 12 * 5)
+		pop()
+		blendMode(DIFFERENCE)
+
+		fill(globalWhite)
+		noStroke()
+		text(this.label, this.widthPx * .5, -this.widthPx - standardUnit * .1)
+		text("WHITE", this.widthPx / 12 * 6, this.widthPx / 12 * 4)
+		text("PINK", this.widthPx / 12 * 6, this.widthPx / 12 * 10)
+		text("BROWN", this.widthPx / 12 * 6, this.widthPx / 12 * 16)
+		pop()
+
+	}
+}
+
+class OctaveSelect {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.octaveIndex = 0
+		this.octave = 1
+
+		this.label = label
+
+		this.noteUp = false
+		this.noteDown = false
+
+	}
+
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		textAlign(CENTER)
+		rectMode(CENTER)
+		
+
+		noFill()
+		stroke(globalWhite)
+
+		if(mouseDown) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, 0) < this.widthPx / 12 * 2.5) {
+				this.octaveIndex = 3
+				this.octave = 8
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, standardUnit * .4) < this.widthPx / 12 * 2.5) {
+				this.octaveIndex = 2
+				this.octave = 4
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, standardUnit * .8) < this.widthPx / 12 * 2.5) {
+				this.octaveIndex = 1
+				this.octave = 2
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, standardUnit * 1.2) < this.widthPx / 12 * 2.5) {
+				this.octaveIndex = 0
+				this.octave = 1
+			}
+		}
+
+		strokeWeight(1)
+		push()
+		if(this.octaveIndex == 3) {
+			this.octave = 8
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, 0, this.widthPx / 12 * 8, this.widthPx / 12 * 4)
+		pop()
+		push()
+		if(this.octaveIndex == 2) {
+			this.octave = 4
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, standardUnit * .4, this.widthPx / 12 * 8, this.widthPx / 12 * 4)
+		pop()
+		push()
+		if(this.octaveIndex == 1) {
+			this.octave = 2
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, standardUnit * .8, this.widthPx / 12 * 8, this.widthPx / 12 * 4)
+		pop()
+		push()
+		if(this.octaveIndex == 0) {
+			this.octave = 1
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, standardUnit * 1.2, this.widthPx / 12 * 8, this.widthPx / 12 * 4)
+		pop()
+		blendMode(DIFFERENCE)
+		fill(globalWhite)
+		noStroke()
+		text(this.label, this.widthPx * .5, -this.widthPx - standardUnit * .1)
+		text("OUCH", 0, standardUnit * .05)
+		text("HIGH", 0, standardUnit * .45)
+		text("MID", 0, standardUnit * .85)
+		text("LOW", 0, standardUnit * 1.25)
+		pop()
+	}
+}
+
+//EFFECT-CLASSES--------------------------------------------------------------------
+
+class Effects {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+
+		this.reverb = new Reverb(this.posx, this.posy, this.sizew, this.sizeh, "Reverb")
+		this.delay = new Delay(this.posx, this.posy - standardUnit * 2.4, this.sizew, this.sizeh, "Delay")
+		this.vibrato = new Vibrato(this.posx, this.posy - standardUnit * 4.8, this.sizew, this.sizeh, "Distortion")
+		this.phaser = new Phaser(this.posx, this.posy - standardUnit * 7.2, this.sizew, this.sizeh, "Distortion")
+		this.distortion = new Distortion(this.posx, this.posy - standardUnit * 10.45, this.sizew, this.sizeh, "Distortion")
+
+	}
+	display() {
+		push()
+		this.reverb.display()
+		this.delay.display()
+		this.vibrato.display()
+		this.phaser.display()
+		this.distortion.display()
+		translate(this.posx, this.posy)
+		stroke(globalWhite)
+		line(-standardUnit * .5, standardUnit * .7, -standardUnit * .5, -standardUnit * 12.7)
+		pop()
+	}
+}
+
+class Distortion {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, 255)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+
+		this.icon = new DistortionIcon(this.posx, this.posy - ((standardUnit * 2) * this.sizew), this.sizew, this.sizeh)
+		this.distortionKnob = new Knob(this.posx + standardUnit * .3, this.posy - standardUnit * .25, 1.2, 1.2, "Distortion", 0, 1)
+		this.mixKnob = new Knob(this.posx + standardUnit * 2.3, this.posy - standardUnit * .25, 1.2, 1.2, "AMOUNT", 0, 1)
+
+
+	}
+	display() {
+		push()
+		this.icon.display()
+		this.distortionKnob.display()
+		this.mixKnob.display()
+		translate(this.posx, this.posy)
+		text("DiSTorTiOn", standardUnit * 1.2, -standardUnit * 1.2)
+		noFill()
+		stroke(255)
+		strokeWeight(1)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 6) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 4) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+
+		pop()
+	}
+}
+
+class DistortionIcon {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, 255)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		noFill()
+		stroke(255)
+		strokeWeight(1)
+		rect(0, 0, this.widthPx, -this.widthPx)
+		rect(this.unit, -this.unit, this.unit * 9, -this.unit * 9)
+
+		line(this.unit * 2, -this.unit * 5, this.unit * 4, -this.unit * 5)
+		beginShape()
+		strokeWeight(2)
+		stroke(255, 90, 0)
+		vertex(this.unit * 4, -this.unit * 5)
+		vertex(this.unit * 5, -this.unit * 6)
+		vertex(this.unit * 6, -this.unit * 4)
+		vertex(this.unit * 7, -this.unit * 8)
+		vertex(this.unit * 8, -this.unit * 3)
+		vertex(this.unit * 9, -this.unit * 5)
+		endShape()
+
+
+		pop()
+	}
+}
+
+class Reverb {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+
+		this.icon = new ReverbIcon(this.posx, this.posy - ((standardUnit * 2) * this.sizew), this.sizew, this.sizeh)
+		this.roomsizeKnob = new Knob(this.posx + standardUnit * .3, this.posy - standardUnit * .25, 1.2, 1.2, "Size", 0, 1)
+		this.dampKnob = new Knob(this.posx + standardUnit * 1.3, this.posy - standardUnit * .25, 1.2, 1.2, "Damp", 0, 1)
+		this.mixKnob = new Knob(this.posx + standardUnit * 2.3, this.posy - standardUnit * .25, 1.2, 1.2, "AMOUNT", 0, 1)
+
+
+	}
+	display() {
+		push()
+		this.icon.display()
+		this.roomsizeKnob.display()
+		this.dampKnob.display()
+		this.mixKnob.display()
+		translate(this.posx, this.posy)
+		text("REVERRRrrb...", standardUnit * 1.2, -standardUnit * 1.2)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 6) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 4) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+
+		pop()
+	}
+}
+
+class ReverbIcon {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(0, 0, this.widthPx, -this.widthPx)
+		rect(this.unit, -this.unit, this.unit * 9, -this.unit * 9)
+		for(let i = 1; i < 6; i++) {
+			stroke(255 - (i * 30), 255, 255 - (i * 20))
+			strokeWeight(map(i, 0, 6, 2, 1))
+			circle(this.unit * 5.5, -this.unit * 5.5, i * (i / 2) * 2.8 * (standardUnit / 50))
+		}
+
+		pop()
+	}
+}
+class Delay {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, 255)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+		this.bpm = 0
+
+		this.lockedSteps = [1/1, (1/2)*1.5, 1/(1*3), 1/2, (1/4)*1.5, 1/(2*3), 1/4, (1/8)*1.5, 1/(4*3), 1/8, (1/16)*1.5, 1/(8*3), 1/16, (1/32)*1.5, 1/(16*3)]
+		this.lockedStepNames = ["1/1", "1/2dot", "1/1tri", "1/2", "1/4dot", "1/2trip", "1/4", "1/8dot", "1/4trip", "1/8", "1/16dot", "1/8trip", "1/16", "1/32dot", "1/16trip"]
+
+		this.icon = new DelayIcon(this.posx, this.posy - ((standardUnit * 2) * this.sizew), this.sizew, this.sizeh)
+		this.delayTimeKnob = new Knob(this.posx + standardUnit * .3, this.posy - standardUnit * .33, 1.2, 1.2, "Time", 0, 1)
+		this.delayTimeKnob.quantize = 1/(this.lockedSteps.length-1)
+
+		this.feedbackKnob = new Knob(this.posx + standardUnit * 1.3, this.posy - standardUnit * .25, 1.2, 1.2, "Feedback", 0, 1)
+		this.mixKnob = new Knob(this.posx + standardUnit * 2.3, this.posy - standardUnit * .25, 1.2, 1.2, "AMOUNT", 0, 1)
+
+
+	}
+	display() {
+		push()
+		this.icon.display()
+		this.delayTimeKnob.display()
+		this.feedbackKnob.display()
+		this.mixKnob.display()
+
+		this.delayTimeStepped = constrain(60/(bpm/(this.lockedSteps[this.delayTimeKnob.knobVal * (this.lockedSteps.length-1)])), 0, 1)
+		this.delayTimeKnob.labelVal = this.lockedStepNames[this.delayTimeKnob.knobVal * (this.lockedSteps.length-1)]
+		translate(this.posx, this.posy)
+		text("Delay lay ay y", standardUnit * 1.2, -standardUnit * 1.2)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 6) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 4) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+
+		pop()
+	}
+}
+
+class DelayIcon {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(0, 0, this.widthPx, -this.widthPx)
+		rect(this.unit, -this.unit, this.unit * 9, -this.unit * 9)
+		for(let i = 0; i < 6; i++) {
+			stroke(255 - (i * 30), 255 - (i * 10), 255)
+			strokeWeight(map(i, 0, 6, 2, 1))
+			line(this.unit * 2 + (this.unit * (i * 1.35)), -this.unit * 3 - (this.unit * (i * .5)), this.unit * 2 + (this.unit * (i * 1.35)), -this.unit * 8 + (this.unit * (i * .5)))
+		}
+
+		pop()
+	}
+}
+
+class Vibrato {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, 255)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+
+		this.icon = new VibratoIcon(this.posx, this.posy - ((standardUnit * 2) * this.sizew), this.sizew, this.sizeh)
+		this.freqKnob = new Knob(this.posx + standardUnit * .3, this.posy - standardUnit * .25, 1.2, 1.2, "Speed", 0, 1)
+		this.depthKnob = new Knob(this.posx + standardUnit * 1.3, this.posy - standardUnit * .25, 1.2, 1.2, "Depth", 0, 1)
+		this.mixKnob = new Knob(this.posx + standardUnit * 2.3, this.posy - standardUnit * .25, 1.2, 1.2, "AMOUNT", 0, 1)
+
+
+	}
+	display() {
+		push()
+		this.icon.display()
+		this.freqKnob.display()
+		this.depthKnob.display()
+		this.mixKnob.display()
+		translate(this.posx, this.posy)
+		text("ViBrAtO", standardUnit * 1.2, -standardUnit * 1.2)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 6) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 4) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+
+		pop()
+	}
+}
+
+class VibratoIcon {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+
+		this.waveScale = 2.25
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(0, 0, this.widthPx, -this.widthPx)
+		rect(this.unit, -this.unit, this.unit * 9, -this.unit * 9)
+
+		beginShape()
+		strokeWeight(2)
+		stroke(255, 90, 0)
+		for(let i = 0; i < 3; i++) {
+			stroke(255, map(i, 0, 3, 255, 0), map(i, 0, 3, 255, 80))
+			this.heightOffset = (i + 1) * 1
+			bezier((this.waveScale * this.unit * i) + this.unit * 2, -this.unit * (9 - (this.heightOffset * .5)),
+				(this.waveScale * this.unit * i + (this.waveScale * this.unit) * 0.25) + this.unit * 2, -this.unit * (9 - this.heightOffset),
+				(this.waveScale * this.unit * i + (this.waveScale * this.unit) * .25) + this.unit * 2, -this.unit * (2 + this.heightOffset),
+				(this.waveScale * this.unit * i + (this.waveScale * this.unit) * .5) + this.unit * 2, -this.unit * (2 + this.heightOffset))
+			bezier((this.waveScale * this.unit * i + (this.waveScale * this.unit) * .5) + this.unit * 2, -this.unit * (2 + this.heightOffset),
+				(this.waveScale * this.unit * i + (this.waveScale * this.unit) * .75) + this.unit * 2, -this.unit * (2 + this.heightOffset),
+				(this.waveScale * this.unit * i + (this.waveScale * this.unit) * .75) + this.unit * 2, -this.unit * (9 - this.heightOffset),
+				(this.waveScale * this.unit * i + (this.waveScale * this.unit) * 1) + this.unit * 2, -this.unit * (9 - ((this.heightOffset + 1) * .5)))
+		}
+		endShape()
+
+
+		pop()
+	}
+}
+
+class Phaser {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, 255)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+
+		this.icon = new PhaserIcon(this.posx, this.posy - ((standardUnit * 3.7) * this.sizew), this.sizew, this.sizeh)
+		this.freqKnob = new Knob(this.posx + standardUnit * .3, this.posy - standardUnit * .25, 1.2, 1.2, "Speed", 0, 1)
+		this.depthKnob = new Knob(this.posx + standardUnit * 1.3, this.posy - standardUnit * .25, 1.2, 1.2, "Depth", 0, 1)
+		this.resKnob = new Knob(this.posx + standardUnit * .8, this.posy - standardUnit * 1.15, 1.2, 1.2, "Resonance", 0, 1)
+		this.mixKnob = new Knob(this.posx + standardUnit * 2.3, this.posy - standardUnit * .25, 1.2, 1.2, "AMOUNT", 0, 1)
+
+
+	}
+	display() {
+		push()
+		this.icon.display()
+		this.freqKnob.display()
+		this.depthKnob.display()
+		this.resKnob.display()
+		this.mixKnob.display()
+		translate(this.posx, this.posy)
+		text("Ph as er", standardUnit * 2, -standardUnit * 1.2)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(((standardUnit * 3.6) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 2) * this.sizew, -(standardUnit * 2.6) * this.sizeh)
+		rect(-((standardUnit * .4) * this.sizew), ((standardUnit * .6) * this.sizeh), (standardUnit * 4) * this.sizew, -(standardUnit * 4.3) * this.sizeh)
+
+		pop()
+	}
+}
+
+class PhaserIcon {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.unit = this.widthPx / 11
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		noFill()
+		stroke(globalWhite)
+		strokeWeight(1)
+		rect(0, 0, this.widthPx, -this.widthPx)
+		rect(this.unit, -this.unit, this.unit * 9, -this.unit * 9)
+
+
+		beginShape()
+		strokeWeight(2)
+		stroke(190, 255, 0)
+		for(let i = 0; i < 2; i++) {
+			bezier((3 * this.unit * i) + this.unit * 3, -this.unit * 7,
+				(3 * this.unit * i + (3 * this.unit) * 0.25) + this.unit * 3, -this.unit * 7,
+				(3 * this.unit * i + (3 * this.unit) * .25) + this.unit * 3, -this.unit * 4,
+				(3 * this.unit * i + (3 * this.unit) * .5) + this.unit * 3, -this.unit * 4)
+			bezier((3 * this.unit * i + (3 * this.unit) * .5) + this.unit * 3, -this.unit * 4,
+				(3 * this.unit * i + (3 * this.unit) * .75) + this.unit * 3, -this.unit * 4,
+				(3 * this.unit * i + (3 * this.unit) * .75) + this.unit * 3, -this.unit * 7,
+				(3 * this.unit * i + (3 * this.unit) * 1) + this.unit * 3, -this.unit * 7)
+		}
+		strokeWeight(1)
+		stroke(globalWhite)
+		for(let i = 0; i < 2; i++) {
+			bezier((3 * this.unit * i) + this.unit * 2, -this.unit * 7,
+				(3 * this.unit * i + (3 * this.unit) * 0.25) + this.unit * 2, -this.unit * 7,
+				(3 * this.unit * i + (3 * this.unit) * .25) + this.unit * 2, -this.unit * 4,
+				(3 * this.unit * i + (3 * this.unit) * .5) + this.unit * 2, -this.unit * 4)
+			bezier((3 * this.unit * i + (3 * this.unit) * .5) + this.unit * 2, -this.unit * 4,
+				(3 * this.unit * i + (3 * this.unit) * .75) + this.unit * 2, -this.unit * 4,
+				(3 * this.unit * i + (3 * this.unit) * .75) + this.unit * 2, -this.unit * 7,
+				(3 * this.unit * i + (3 * this.unit) * 1) + this.unit * 2, -this.unit * 7)
+		}
+		endShape()
+
+
+		pop()
+	}
+}
+
+class SynthSelect {
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5, synthIndexDefault = 0) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.synthIndex = synthIndexDefault
+		
+		this.pos1 = standardUnit * 2.5
+		this.pos2 = standardUnit * 3.5
+		this.pos3 = standardUnit * 4.5
+		this.pos4 = standardUnit * 5.5
+		
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		textAlign(CENTER)
+		rectMode(CENTER)
+		noFill()
+		strokeWeight(1)
+		stroke(255)
+		if(mouseDown) {
+			if(dist(mouseX - width / 2, mouseY - height / 2, this.posx + this.pos1, this.posy) < standardUnit * .5) {
+				this.synthIndex = 0
+			}
+			if(dist(mouseX - width / 2, mouseY - height / 2, this.posx + this.pos2, this.posy) < standardUnit * .5) {
+				this.synthIndex = 1
+			}
+			if(dist(mouseX - width / 2, mouseY - height / 2, this.posx + this.pos3, this.posy) < standardUnit * .5) {
+				this.synthIndex = 2
+			}
+			if(dist(mouseX - width / 2, mouseY - height / 2, this.posx + this.pos4, this.posy) < standardUnit * .5) {
+				this.synthIndex = 3
+			}
+		}
+		line(0, -standardUnit * .35, standardUnit * 10, -standardUnit * .35)
+		push()
+		if(this.synthIndex == 0) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.pos1, 0, standardUnit, standardUnit * .7)
+		rect(this.pos1, 0, standardUnit * .9, standardUnit * .6)
+		pop()
+		push()
+		if(this.synthIndex == 1) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.pos2, 0, standardUnit, standardUnit * .7)
+		rect(this.pos2, 0, standardUnit * .9, standardUnit * .6)
+		pop()
+		push()
+		if(this.synthIndex == 2) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.pos3, 0, standardUnit, standardUnit * .7)
+		rect(this.pos3, 0, standardUnit * .9, standardUnit * .6)
+		pop()
+		push()
+		if(this.synthIndex == 3) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(this.pos4, 0, standardUnit, standardUnit * .7)
+		rect(this.pos4, 0, standardUnit * .9, standardUnit * .6)
+		pop()
+
+		blendMode(DIFFERENCE)
+
+		fill(255)
+		noStroke()
+		textSize(32 * (standardUnit * .01))
+		text("TRACK:", standardUnit * .8, standardUnit * .1)
+		textSize(32 * (standardUnit * .02))
+		text(1, this.pos1, standardUnit * .23)
+		text(2, this.pos2, standardUnit * .23)
+		text(3, this.pos3, standardUnit * .23)
+		text(4, this.pos4, standardUnit * .23)
+		pop()
+	}
+}
+
+class Sequencer {
+	constructor(posx, posy, sizew, sizeh, seqScale) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+
+		this.x = 0
+		this.x2 = 0
+
+		this.seqLength = 32
+		this.noteCount = 36
+
+		this.seqUnitSize = width / 60
+
+		this.sequencerTracks = []
+
+		this.seq1note = 55
+
+		this.brightnessActive = 255
+		this.brightnessInactive = 100
+
+		this.sequencerData = {
+			sequencerSettings: {
+				bpm: 10,
+			},
+			trackData: []
+		}
+
+
+		for(let i = 0; i < 4; i++) {
+			this.sequencerTracks.push(new SequencerTrack(this.posx - standardUnit * .2, this.posy, this.sizew, this.sizew, this.seqUnitSize, i))
+		}
+		for(let i = 0; i < this.sequencerTracks.length; i++) {
+			this.sequencerData.trackData.push(this.sequencerTracks[i].trackData)
+
+		}
+		this.functionSelect = new SeqFunctionSelect(this.posx + standardUnit * 4.5, this.posy - standardUnit * .55, this.sizew, this.sizew)
+
+		this.seqModeSelect = new SeqModeSelect(this.posx + standardUnit * 3.35, this.posy + standardUnit * .25, this.sizew, this.sizew, "MODE")
+
+		this.bpmKnob = new Knob(this.posx + standardUnit * 5.5, this.posy - standardUnit * 0.3, 1.5, 1.5, "BPM", 0.5)
+
+	}
+	display() {
+		push()
+		this.bpmKnob.display()
+		this.bpm = floor(map(this.bpmKnob.knobVal, 0, 1, 20, 200))
+		bpm = this.bpm
+
+		this.functionSelect.display()
+		this.seqModeSelect.display()
+
+		if(!pause) {
+			this.x += (this.bpm / 3600) * 4
+		}
+		if(this.x >= this.seqLength) {
+			this.x = 0
+		}
+
+		for(let i = 0; i < 4; i++) {
+
+			// synthekindas[i].noteLength = this.sequencerTracks[i].noteLength
+			synthekindas[i].synth.chordMode = this.sequencerTracks[i].chord
+			synthekindas[i].synth.freq = this.sequencerTracks[i].seqNote
+			synthekindas[i].synth.freq2 = this.sequencerTracks[i].seqNote3rd
+			synthekindas[i].synth.freq3 = this.sequencerTracks[i].seqNote5th
+			synthekindas[i].gate = this.sequencerTracks[i].seqTrigger
+		}
+		
+		for(this.s of this.sequencerTracks) {
+			this.s.func = this.functionSelect.funcSelect
+			this.s.chordMode = this.functionSelect.chordSelect
+			this.s.changeChord = this.functionSelect.changeChord
+			this.s.noteUp = this.functionSelect.noteUp
+			this.s.noteDown = this.functionSelect.noteDown
+			this.s.x = this.x
+			this.s.display()
+			this.s.notePlayedBlip = false
+			this.s.noteKnobMapped = this.noteKnobMapped
+			this.s.modeSelect = this.seqModeSelect.modeSelect
+		}
+
+		stroke(255, 0, 0)
+
+
+		pop()
+	}
+
+	updateData() {
+		for(let i = 0; i < this.sequencerTracks.length; i++) {
+			this.sequencerTracks[i].updateTrackData()
+			this.sequencerData.trackData[i] = this.sequencerTracks[i].trackData
+		}
+		this.sequencerData.sequencerSettings.bpm = this.bpmKnob.knobPos
+	}
+	loadData() {
+		this.bpmKnob.knobPos = this.sequencerData.sequencerSettings.bpm
+	}
+}
+
+class SequencerTrack {
+	constructor(posx, posy, sizew, sizeh, seqScale, trackID) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+
+		this.func
+		this.chordMode
+		this.chord = 0
+		this.changeChord = false
+
+		this.modeSelect = 2
+
+		this.trackID = trackID
+
+		this.x = 0
+		this.xOld = 0
+
+		this.seqLength = 32
+		this.noteCount = 40
+
+		this.seqUnitSize = width / 60
+
+		this.notes = []
+		this.noteUp
+		this.noteDown
+
+		for(let i = 0; i < this.noteCount; i++) {
+			this.notes.push(32.70 * pow(2, i / 12)) // start at C#1
+		}
+		this.majorSkips = [1, 3, 6, 8, 10, 13, 15, 18, 20, 22, 25, 27, 30, 32, 34, 37, 39]
+		this.minorSkips = [1, 4, 6, 9, 11, 13, 16, 18, 21, 23, 25, 28, 30, 33, 35, 37, 40]
+
+		this.sequencerUnit = []
+
+		this.noteHoldCounter = 0
+		this.seqNote = 1
+		this.seqNote3rd = 1
+		this.seqNote5th = 1
+
+		this.brightnessActive = 255
+		this.brightnessInactive = 100
+
+		this.unitBrightness = 1
+		this.unitBrightnessAlt = false
+		this.unitBrightnessAltCounter = 0
+
+		for(let i = 0; i < this.seqLength; i++) {
+
+			if(this.unitBrightnessAltCounter >= 4) {
+				this.unitBrightnessAlt = !this.unitBrightnessAlt
+				this.unitBrightnessAltCounter = 0
+			}
+			if(this.unitBrightnessAlt) {
+				this.unitBrightness = .6
+			} else {
+				this.unitBrightness = 1
+			}
+			this.unitBrightnessAltCounter++
+
+			this.sequencerUnit.push(new SequencerUnit((i * this.seqUnitSize) - width / 2 + this.posx + standardUnit, this.posy + standardUnit * (.6 * this.trackID) - standardUnit * .4, this.sizew, this.sizew, this.seqUnitSize, this.unitBrightness))
+		}
+
+		this.trackData = { active: [], note: [], chord: [] }
+		this.trackDataActive = []
+		this.trackDataNote = []
+
+		for(let i = 0; i < this.sequencerUnit.length; i++) {
+			this.trackData.active.push(this.sequencerUnit[i].active)
+			this.trackData.note.push(this.sequencerUnit[i].note)
+			this.trackData.chord.push(this.sequencerUnit[i].chord)
+		}
+
+		this.noteLengthKnob = new Knob(this.posx + standardUnit * 2.5, this.posy + standardUnit * (.6 * this.trackID) - standardUnit * .4, .8, 1, "", 0)
+	}
+
+	display() {
+		push()
+		fill(this.brightnessInactive)
+		if(synthIndex == this.trackID){
+			fill(this.brightnessActive)
+		}
+		textSize(fontSize * 1.3)
+		text(str(this.trackID + 1), - width / 2 + this.posx + standardUnit * .3, this.posy + standardUnit * (.6 * this.trackID) - standardUnit * .25)
+		this.seqTrigger = false
+		// this.noteLengthKnob.display()
+		// this.noteLength = map(this.noteLengthKnob.knobPos, 0, 1, .2, 5)
+
+		this.sequencerUnit[floor(this.x)].notePlayedBlip = true
+
+		if(this.noteUp == true || this.noteDown == true) {
+			this.noteHoldCounter += .15
+		}
+
+		for(this.su of this.sequencerUnit) {
+			this.su.func = this.func
+			this.su.display()
+			this.su.notePlayedBlip = false
+			if(this.su.setActive == true) {
+				if(this.noteUp == true && this.su.note < this.noteCount - 1) {
+
+					if(this.modeSelect == 1) {
+						for(let ms = 0; ms < this.majorSkips.length - 1; ms++) {
+							if(this.su.note == this.majorSkips[ms]) {
+								this.su.note++
+							}
+						}
+					}
+					if(this.modeSelect == 2) {
+						for(let ms = 0; ms < this.minorSkips.length - 1; ms++) {
+							if(this.su.note == this.minorSkips[ms]) {
+								this.su.note++
+							}
+						}
+					}
+
+					this.su.note += floor(this.noteHoldCounter)
+				}
+				if(this.noteDown == true && this.su.note > 0) {
+
+					if(this.modeSelect == 1) {
+						for(let ms = 0; ms < this.majorSkips.length - 1; ms++) {
+							if(this.su.note == this.majorSkips[ms]) {
+								this.su.note--
+							}
+						}
+					}
+					if(this.modeSelect == 2) {
+						for(let ms = 0; ms < this.minorSkips.length - 1; ms++) {
+							if(this.su.note == this.minorSkips[ms]) {
+								this.su.note--
+							}
+						}
+					}
+
+
+					this.su.note -= floor(this.noteHoldCounter)
+				}
+				if(this.changeChord) {
+					this.su.chord = this.chordMode
+				}
+				if(this.su.active = true) {}
+			}
+			if(synthIndex == this.trackID) {
+				this.su.brightness = this.brightnessActive
+			} else {
+				this.su.brightness = this.brightnessInactive
+			}
+		}
+		if(mouseIsPressed && this.noteHoldCounter > 1) {
+			this.noteHoldCounter = 0
+		}
+		if(mouseUp) {
+			this.noteHoldCounter = 1
+		}
+		if(floor(this.x) != floor(this.xOld)) { //Make sure trig is not invoked every frame that playhead rests on active note, otherwise no retrigger on consequtive notes = muddy
+			if(this.sequencerUnit[floor(this.x)].active == true) {
+				this.seqTrigger = true
+				this.seqNote = this.notes[this.sequencerUnit[floor(this.x)].note]
+				this.seqNote3rd = this.notes[this.sequencerUnit[floor(this.x)].note3rd] //sequencer track sends current note to sequencer
+				this.seqNote5th = this.notes[this.sequencerUnit[floor(this.x)].note5th]
+				// this.seqNote3rd = 100
+			}
+		} else {
+			this.seqTrigger = false
+		}
+		if(this.sequencerUnit[floor(this.x)].active == true) {
+			this.chord = this.sequencerUnit[floor(this.x)].chord //chord needs to stay active otherwise no ring
+		}
+		this.xOld = this.x
+		pop()
+	}
+
+	updateTrackData() {
+		for(let i = 0; i < this.seqLength; i++) {
+			this.trackData.active[i] = this.sequencerUnit[i].active
+			this.trackData.note[i] = this.sequencerUnit[i].note
+			this.trackData.chord[i] = this.sequencerUnit[i].chord
+		}
+	}
+	loadTrackData() {
+		for(let i = 0; i < this.seqLength; i++) {
+			this.sequencerUnit[i].active = this.trackData.active[i]
+			this.sequencerUnit[i].note = this.trackData.note[i]
+			this.sequencerUnit[i].chord = this.trackData.chord[i]
+		}
+	}
+}
+
+class SequencerUnit {
+	constructor(posx, posy, sizew, sizeh, seqScale, brightnessOffset) {
+
+		this.brightness
+		this.brightnessOffset = brightnessOffset
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.switch = 0
+
+		this.active = false
+
+		this.notePlayedBlip = false
+
+		this.seqScale = seqScale
+
+		this.brightness = 180
+		this.color = 180
+
+		this.func = 0
+		this.chord = 0
+
+		this.noteNames = ["C1", "C#1", "D1", "D#1", "E1", "F1", "F#1", "G1", "G#1", "A1", "A#1", "B1",
+			"C2", "C#2", "D2", "D#2", "E2", "F2", "F#2", "G2", "G#2", "A2", "A#2", "B2",
+			"C3", "C#3", "D3", "D#3", "E3", "F3", "F#3", "G3", "G#3", "A3", "A#3", "B3",
+			"C4", "C#4", "D4", "D#4", "E4", "F4"
+		]
+		this.note = 12
+		this.third = 3
+
+	}
+	display() {
+		push()
+		rectMode(CENTER)
+		textAlign(CENTER)
+		textSize(standardUnit * .2)
+		translate(this.posx, this.posy)
+
+		strokeWeight(1.5)
+		if(this.notePlayedBlip == true) {
+			strokeWeight(3)
+		}
+		fill(0)
+		stroke(this.brightness * this.brightnessOffset)
+		if(mouseIsPressed) {
+			if(this.func == 0) {
+				if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, 0) < this.seqScale / 2 && this.switch < 1 && knobActive == false) {
+					this.active = !this.active
+					this.switch++
+				}
+			}
+			if(this.func == 1) {
+				if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, 0) < this.seqScale / 2 && this.switch < 1 && knobActive == false) {
+					this.setActive = !this.setActive
+					this.switch++
+				}
+			}
+		}
+		if(this.active == false) {
+			this.setActive = false
+		}
+		if(mouseUp) {
+			this.switch = 0
+		}
+
+		rect(0, 0, this.seqScale * .95, this.seqScale * .5)
+
+		if(this.active == true) {
+			rect(0, 0, this.seqScale * .95, this.seqScale * .8)
+			fill(255)
+			noStroke()
+			rect(0, map(this.note, 0, this.noteNames.length - 1, this.seqScale * .4, 0), this.seqScale * .95, map(this.note, 0, this.noteNames.length - 1, this.seqScale * .1, this.seqScale * .8))
+			blendMode(DIFFERENCE)
+			text(this.noteNames[this.note], 0, 0 + this.seqScale * .5 * .25)
+			blendMode(BLEND)
+			if(this.chord == 1) {
+				push()
+				stroke(0, 255, 200)
+				noFill()
+				strokeWeight(1)
+				rect(0, 0, this.seqScale * .85, this.seqScale * .7)
+				pop()
+			}
+			if(this.chord == 2) {
+				push()
+				stroke(255, 180, 100)
+				noFill()
+				strokeWeight(2)
+				rect(0, 0, this.seqScale * .85, this.seqScale * .7)
+				pop()
+			}
+		}
+		if(this.setActive == true) {
+
+			stroke(220, 0, 90)
+			strokeWeight(2)
+			noFill()
+			rect(0, 0, this.seqScale * .95, this.seqScale * .8)
+		}
+
+		pop()
+
+		this.note = constrain(this.note, 0, this.noteNames.length - 1)
+
+		if(this.chord == 1) {
+			this.third = 4
+		}
+		if(this.chord == 2) {
+			this.third = 3
+		}
+		if(this.note < this.noteNames.length - 10) {
+			this.note3rd = this.note + this.third
+			this.note5th = this.note + 7
+		} else {
+			this.note3rd = this.note - this.third
+			this.note5th = this.note - 7
+		}
+
+	}
+}
+
+class SeqFunctionSelect {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.funcSelect = 0
+		this.changeChord = false
+
+		this.label = label
+
+		this.noteUp = false
+		this.noteDown = false
+		this.chordSelect = 4
+
+	}
+
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		textAlign(CENTER)
+		rectMode(CENTER)
+
+		noFill()
+		stroke(globalWhite)
+		//FUNCTION SELECTION
+		if(mouseDown) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, 0) < this.widthPx / 12 * 2.5) {
+				this.funcSelect = 0
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, standardUnit * .5) < this.widthPx / 12 * 2.5) {
+				this.funcSelect = 1
+			}
+		}
+		push()
+		if(this.funcSelect == 0) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, 0, this.widthPx / 12 * 10, this.widthPx / 12 * 5)
+		pop()
+		strokeWeight(1)
+		if(this.funcSelect == 1) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, standardUnit * .5, this.widthPx / 12 * 10, this.widthPx / 12 * 5)
+		noFill()
+		push()
+		rect(this.widthPx / 12 * 5.5, this.widthPx / 12 * 18, this.widthPx / 12 * 22, this.widthPx / 12 * 17)
+		pop()
+		strokeWeight(1)
+		//NOTECONTROLL
+		if(mouseIsPressed) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, standardUnit * 1.1) < this.widthPx / 12 * 2.5 && this.noteDown == false && knobActive == false) {
+				this.noteUp = true
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, 0, standardUnit * 1.48) < this.widthPx / 12 * 2.5 && this.noteUp == false && knobActive == false) {
+				this.noteDown = true
+			}
+		} else {
+			this.noteUp = false
+			this.noteDown = false
+		}
+		push()
+		if(this.noteUp) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, standardUnit * 1.1, this.widthPx / 12 * 7, this.widthPx / 12 * 4)
+		
+		pop()
+		push()
+		if(this.noteDown) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(0, standardUnit * 1.48, this.widthPx / 12 * 7, this.widthPx / 12 * 4)
+		
+		pop()
+
+		if(mouseIsPressed) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, standardUnit * .9, standardUnit * 1.1) < this.widthPx / 12 * 2.5 && knobActive == false) {
+				this.chordSelect = 0
+				this.changeChord = true
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, standardUnit * .9, standardUnit * 1.5) < this.widthPx / 12 * 2.5 && knobActive == false) {
+				this.chordSelect = 1
+				this.changeChord = true
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, standardUnit * .9, standardUnit * 1.9) < this.widthPx / 12 * 2.5 && knobActive == false) {
+				this.chordSelect = 2
+				this.changeChord = true
+			}
+		}
+		if(mouseUp) {
+			this.changeChord = false
+		}
+		push()
+		if(this.chordSelect == 0 && this.changeChord == true) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		rect(standardUnit * .9, standardUnit * 1.1, this.widthPx / 12 * 8.5, this.widthPx / 12 * 4)
+		pop()
+		push()
+		if(this.chordSelect == 1 && this.changeChord == true) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		stroke(0, 255, 200)
+		rect(standardUnit * .9, standardUnit * 1.5, this.widthPx / 12 * 8.5, this.widthPx / 12 * 4)
+		pop()
+		push()
+		if(this.chordSelect == 2 && this.changeChord == true) {
+			strokeWeight(2)
+			fill(colActive)
+		}
+		stroke(255, 180, 100)
+		rect(standardUnit * .9, standardUnit * 1.9, this.widthPx / 12 * 8.5, this.widthPx / 12 * 4)
+		pop()
+
+		fill(globalWhite)
+		noStroke()
+		text(this.label, this.widthPx * .5, -this.widthPx - standardUnit * .1)
+		blendMode(DIFFERENCE)
+
+		//Notechange arrows
+		beginShape()
+		vertex(-this.widthPx / 12 * 2, standardUnit * 1.15)
+		vertex(0, standardUnit * 1.02)
+		vertex(this.widthPx / 12 * 2, standardUnit * 1.15)
+		endShape()
+		beginShape()
+		vertex(-this.widthPx / 12 * 2, standardUnit * 1.4)
+		vertex(0, standardUnit * 1.53)
+		vertex(this.widthPx / 12 * 2, standardUnit * 1.4)
+		endShape()
+
+		text("ON/OFF", 0, standardUnit * .05)
+		text("NOTE", 0, standardUnit * .55)
+		text("single", standardUnit * .9, standardUnit * 1.14)
+		text("major", standardUnit * .9, standardUnit * 1.54)
+		text("minor", standardUnit * .9, standardUnit * 1.94)
+
+		pop()
+	}
+}
+
+class SeqModeSelect {
+
+	constructor(posx, posy, sizew, sizeh, label, brightness = .5) {
+
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.label = label
+
+		this.widthPx = (standardUnit * 2) * this.sizew
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.modeSelect = 2
+		this.changeChord = false
+
+		this.posSel1x = 0
+		this.posSel1y = standardUnit * .3
+
+		this.posSel2x = 0
+		this.posSel2y = standardUnit * .7
+
+		this.posSel3x = 0
+		this.posSel3y = standardUnit * 1.1
+
+	}
+
+	display() {
+		push()
+		textAlign(CENTER)
+		rectMode(CENTER)
+		translate(this.posx, this.posy)
+
+		noFill()
+		stroke(255)
+		strokeWeight(1)
+
+		if(mouseDown) {
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.posSel1x, this.posSel1y) < this.widthPx / 12 * 2.5) {
+				this.modeSelect = 0
+
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.posSel2x, this.posSel2y) < this.widthPx / 12 * 2.5) {
+				this.modeSelect = 1
+
+			}
+			if(dist(mouseX - width / 2 - this.posx, mouseY - height / 2 - this.posy, this.posSel3x, this.posSel3y) < this.widthPx / 12 * 2.5) {
+				this.modeSelect = 2
+
+			}
+		}
+		push()
+		if(this.modeSelect == 0) {
+			strokeWeight(2)
+			stroke(255)
+			fill(colActive)
+		}
+		rect(this.posSel1x, this.posSel1y, this.widthPx / 12 * 7, this.widthPx / 12 * 4)
+		pop()
+		push()
+		if(this.modeSelect == 1) {
+			strokeWeight(2)
+			stroke(255)
+			fill(colActive)
+		}
+		rect(this.posSel2x, this.posSel2y, this.widthPx / 12 * 7, this.widthPx / 12 * 4)
+		pop()
+		push()
+		if(this.modeSelect == 2) {
+			strokeWeight(2)
+			stroke(255)
+			fill(colActive)
+		}
+		rect(this.posSel3x, this.posSel3y, this.widthPx / 12 * 7, this.widthPx / 12 * 4)
+		pop()
+
+		noStroke()
+		fill(255)
+		text(this.label, 0, 0)
+		blendMode(DIFFERENCE)
+
+		text("FREE", this.posSel1x, this.posSel1y + standardUnit * .05)
+		text("CMaj", this.posSel2x, this.posSel2y + standardUnit * .05)
+		text("CMin", this.posSel3x, this.posSel3y + standardUnit * .05)
+
+		pop()
+	}
+}
+
+class FileMenu {
+	constructor(posx, posy, sizew, sizeh) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+
+		this.selectSize = .8
+
+		this.posxPreset = standardUnit * 1.12
+		this.posxNew = standardUnit * 2.3
+		this.posxSave = standardUnit * 3.4
+		this.posxOverride = standardUnit * 4.5
+		this.posxLoad = standardUnit * 5.6
+		this.posxImage = standardUnit * 7.4
+		this.posxFile = standardUnit * 8.5
+		textSize(fontSize)
+		this.textS = fontSize
+		this.textInputScalar = 0
+
+		this.saveImage = false
+
+		this.infoButton = new MenuButton(-width / 2 + standardUnit * 1.2, -height / 2 + standardUnit * 1.23, scaleUniv, scaleUniv, "i", this.selectSize, this.selectSize, this.textS * 1, false)
+		this.info = new Info(-width / 2 + standardUnit * 1.2, -height / 2 + standardUnit * 2)
+
+		this.textS = 10 * standardUnit * .023
+		this.dropDownDemo = new DropDown(this.posx, this.posy, scaleUniv, scaleUniv, standardUnit * 5.5 * this.sizew, this.selectSize, this.textS, this.posxPreset, false)
+		this.dropDownUser = new DropDown(this.posx, this.posy + standardUnit * .5, scaleUniv, scaleUniv, standardUnit * 5.5 * this.sizew, this.selectSize, this.textS, this.posxPreset, true)
+		this.newButton = new MenuButton(this.posx + this.posxNew, this.posy, scaleUniv, scaleUniv, "New", 2, this.selectSize, this.textS, false)
+		this.deleteButton = new MenuButton(this.posx + this.posxNew, this.posy + standardUnit * .5, scaleUniv, scaleUniv, "Delete", 2, this.selectSize, this.textS, false)
+		this.saveButton = new MenuButton(this.posx + this.posxSave, this.posy, scaleUniv, scaleUniv, "Save", 2, this.selectSize, this.textS, false)
+		this.overrideButton = new MenuButton(this.posx + this.posxOverride, this.posy, scaleUniv, scaleUniv, "Override", 2, this.selectSize, this.textS, false)
+		this.loadButton = new MenuButton(this.posx + this.posxLoad, this.posy, scaleUniv, scaleUniv, "Load", 2, this.selectSize, this.textS, false)
+		this.imageButton = new MenuButton(this.posx + this.posxImage, this.posy, scaleUniv, scaleUniv, "Image", 2, this.selectSize, this.textS, false)
+		this.fileButton = new MenuButton(this.posx + this.posxFile, this.posy, scaleUniv, scaleUniv, "Settings", 2, this.selectSize, this.textS, false)
+		
+		this.clearCanvasButton = new MenuButton(-width / 2 + standardUnit * 2, -height / 2 + standardUnit * 1.23, scaleUniv, scaleUniv, "ERASE", 2, this.selectSize, this.textS, false)
+		this.hideGUIButton = new MenuButton(this.posx - standardUnit * 3.5, -height / 2 + standardUnit * 1.23, scaleUniv, scaleUniv, "Hide", 2, this.selectSize, this.textS, false)
+		
+		this.confirmButtonNO = new MenuButton(0 -standardUnit * .6, 0, scaleUniv, scaleUniv, "NO", 2, this.selectSize, this.textS, false)
+		this.confirmButtonYES = new MenuButton(0 +standardUnit * .6, 0, scaleUniv, scaleUniv, "YES", 2, this.selectSize, this.textS, false)
+		
+		this.confirmNameButton = new MenuButton(0 + standardUnit * 4, 0, scaleUniv, scaleUniv, "Nice!", 2, this.selectSize * 2, this.textS, false)
+		
+		this.doWarning = false
+		this.doNaming = false
+		this.override = false
+		this.displayInfo = false
+		
+	}
+	display() {
+		push()
+
+		this.infoButton.display()
+		if(this.infoButton.active == true){
+			this.displayInfo = !this.displayInfo
+			hideToggle = false
+		}
+		if(this.displayInfo == true){
+			this.infoButton.toggle = true
+			this.info.display()
+		}else{
+			this.infoButton.toggle = false
+		}
+		
+		rectMode(CENTER)
+		textAlign(RIGHT)
+		strokeWeight(1)
+		noStroke()
+		textSize(fontSize)
+		text("PRESETS", this.posx, this.posy - standardUnit * .5)
+		text("Demos", this.posx - standardUnit * 1.5, this.posy + standardUnit * .1)
+		text("Yours!", this.posx - standardUnit * 1.5, this.posy + standardUnit * .6)
+		text("EXPORT", this.posx + standardUnit * 8.1, this.posy - standardUnit * .5)
+
+		
+		this.dropDownUser.display()
+		this.dropDownDemo.display()
+		this.newButton.display()
+		this.deleteButton.display()
+		this.saveButton.display()
+		this.overrideButton.display()
+		this.loadButton.display()
+		this.imageButton.display()
+		this.fileButton.display()
+		this.clearCanvasButton.display()
+		this.hideGUIButton.display()
+
+		if(this.hideGUIButton.active == true){
+			hideToggle = !hideToggle
+		}
+		if(hideToggle == true){
+			this.hideGUIButton.toggle = true
+		}else{
+			this.hideGUIButton.toggle = false
+		}
+
+		if(this.clearCanvasButton.active == true){
+			particleRender.clear()
+		}
+
+		if(this.dropDownDemo.dropDownActive == true){
+			this.dropDownUser.dropDownActive = false
+		}
+		if(this.dropDownUser.dropDownActive == true){
+			this.dropDownDemo.dropDownActive = false
+		}
+		
+		if(this.dropDownDemo.selected == true){
+			this.dropDownUser.dropDownActive = false
+			this.dropDownUser.displayActive = false
+			importPresetData(fileMenu.dropDownDemo.options[fileMenu.dropDownDemo.selectedOption])
+			loading = true
+			loadBuffer = 0
+		}
+		if(this.dropDownUser.selected == true){
+			this.dropDownDemo.displayActive = false
+			importPresetData(fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption])
+			loading = true
+			loadBuffer = 0
+		}
+		if(this.madeNew == true){
+			importPresetData(fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption])
+			this.madeNew = false
+		}
+		if(this.newButton.active == true || init == true){
+			newPreset()
+			this.dropDownUser.selectedOption = this.dropDownUser.options.length-1
+			this.madeNew = true
+		}
+		if(this.dropDownUser.options[this.dropDownUser.selectedOption].name == "new"){
+			this.saveButton.stroke = map(sin(frameCount * .05), -1, 1, 1, 3)
+		}else{
+			this.saveButton.stroke = 1
+		}
+		
+		if(this.loadButton.active == true){
+			strokeWeight(2)
+			input.elt.click()
+		}
+		if(this.deleteButton.active == true){
+			this.delete = true
+		}
+		if(this.delete == true){
+			this.confirm("Are you sure? This will delete the current preset!")
+			if(this.confirmButtonYES.active == true){
+				deleteUserPreset()
+				importPresetData(fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption])
+				this.delete = false
+			}
+			if(this.confirmButtonNO.active == true){
+				this.delete = false
+			}
+		}
+		if(this.overrideButton.active == true){
+			this.override = true
+		}
+		if(this.override == true){
+			this.confirm("Are you sure? This will override the previous preset state!")
+			if(this.confirmButtonYES.active == true){
+				userData[this.dropDownUser.selectedOption] = this.dropDownUser.options[this.dropDownUser.selectedOption]
+				saveUserPreset()
+				this.override = false
+			}
+			if(this.confirmButtonNO.active == true){
+				this.override = false
+			}
+		}
+		
+		if(this.saveButton.active == true && this.dropDownUser.options.length > 0 && this.dropDownUser.options[this.dropDownUser.selectedOption].name == "new"){
+			this.doNaming = true
+		}
+		if(this.doNaming == true){
+			this.name()
+			if(this.confirmNameButton.active == true){
+				writeUserData()
+				this.dropDownUser.options[this.dropDownUser.selectedOption].name = textInput.value()
+				//userData[this.dropDownUser.selectedOption - 1] = this.dropDownUser.options[this.dropDownUser.selectedOption - 1]
+				
+				userData[this.dropDownUser.selectedOption] = this.dropDownUser.options[this.dropDownUser.selectedOption]
+				// userData.push() = this.dropDownUser.options[this.dropDownUser.selectedOption]
+				//userData = this.dropDownUser.options
+				saveUserPreset()
+				this.doNaming = false
+			}
+		}
+		pop()
+	}
+
+	confirm(warning) {
+		push()
+		rectMode(CENTER)
+		textAlign(CENTER)
+		
+		fill(0, 180)
+		rect(0, 0, width, height)
+		
+		this.confirmButtonNO.display()
+		this.confirmButtonYES.display()
+		
+		fill(255)
+		noStroke()
+		textSize(this.textS)
+		text(warning, 0, -standardUnit * .5)
+		if(this.confirmButtonNO.active == true){
+			this.confirmYES = false
+			this.confirmNO = true
+			this.doWarning = false
+		}
+		if(this.confirmButtonYES.active == true){
+			this.confirmNO = false
+			this.confirmYES = true
+			this.doWarning = false
+		}
+		pop()
+	}
+	name() {
+		push()
+		rectMode(CENTER)
+		textAlign(CENTER)
+		
+		fill(0, 180)
+		rect(0, 0, width, height)
+		noFill()
+		stroke(255)
+		strokeWeight(1)
+		rect(0, 0, standardUnit * 12 * this.sizew, standardUnit * this.selectSize * 2 * this.sizew)
+		this.confirmNameButton.display()
+		
+		fill(255)
+		noStroke()
+		textSize(this.textS)
+		text("I am nameless, give me one", 0, -standardUnit * 1)
+		if(mouseDown){
+		textInput.elt.focus()
+		}
+		
+		if(textInput.value().length > 29){
+			this.textInputScalar = (textInput.value().length - 29) * .8
+			// this.textInputScalar = (textInput.value().length - 29) * .9
+		}else{
+			this.textInputScalar = 0
+		}
+		
+		textSize(this.textS * 1.7 - this.textInputScalar)
+		text(textInput.value(), 0, 0 + standardUnit * .1)
+		
+		if(this.confirmNameButton.active == true){
+			this.doNaming = false
+		}
+		pop()
+	}
+}
+
+class DropDown {
+	constructor(posx, posy, sizew, sizeh, unitSizeX, unitSizeY, textS, posInt, initDisplay) {
+
+		this.brightness = map(brightness, 0, 1, 0, globalWhite)
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.posInt = posInt
+		this.textS = textS
+
+		this.unitSizeX = unitSizeX
+		this.unitSizeY = unitSizeY
+
+		this.options = []
+		this.selectedOption = 0
+		this.dropDownActive = false
+		this.displayActive = initDisplay
+
+	}
+	display() {
+		push()
+		translate(this.posx, this.posy)
+
+		textAlign(LEFT)
+		rectMode(CENTER)
+		textSize(this.textS)
+		noStroke()
+		fill(255)
+		if(this.options.length > 0 && this.displayActive){
+			text(this.options[this.selectedOption].name.toUpperCase(), 0 - standardUnit * 1.2, 0 + standardUnit * .1)
+		}else{
+			text("Select Preset", 0 - standardUnit * 1.2, 0 + standardUnit * .1)
+		}
+
+		noFill()
+		stroke(255)
+		strokeWeight(1)
+		rect(this.posInt, 0, standardUnit * this.sizew, standardUnit * this.unitSizeY * this.sizew)
+		beginShape()
+		vertex(this.posInt - standardUnit * .3 * this.sizew, -standardUnit * .15 * this.sizew)
+		vertex(this.posInt, +standardUnit * .15 * this.sizew)
+		vertex(this.posInt + standardUnit * .3 * this.sizew, -standardUnit * .15 * this.sizew)
+		endShape()
+		if(this.displayActive == true){
+			strokeWeight(2.5)
+		}
+		rect(0, 0, standardUnit * 5.5 * this.sizew, standardUnit * this.unitSizeY * this.sizew)
+
+		if(mouseDown) {
+			if(dist(mouseX - width / 2, mouseY - height / 2, this.posx + this.posInt, this.posy) < standardUnit * .5 * this.sizew * 1) {
+				this.dropDownActive = !this.dropDownActive
+			}
+		}
+		this.selected = false
+		if(this.dropDownActive == true) {
+			for(let i = 0; i < this.options.length; i++) {
+				strokeWeight(1)
+				fill(0)
+				if(this.selectedOption == i) {
+					strokeWeight(2)
+					fill(10)
+				}
+				stroke(255)
+
+				rect(0, 0 + standardUnit * .55 * (i + 1), this.unitSizeX, standardUnit * this.sizew)
+				
+				rect(this.posInt, 0 + standardUnit * .55 * (i + 1), standardUnit * this.sizew, standardUnit * this.sizew)
+				beginShape()
+				vertex(this.posInt - standardUnit * .3 * this.sizew, standardUnit * .15 * this.sizew + standardUnit * .55 * (i + 1))
+				vertex(this.posInt, -standardUnit * .15 * this.sizew + standardUnit * .55 * (i + 1))
+				vertex(this.posInt + standardUnit * .3 * this.sizew, standardUnit * .15 * this.sizew + standardUnit * .55 * (i + 1))
+				endShape()
+
+				fill(255)
+				noStroke()
+				text(this.options[i].name.toUpperCase(), 0 - standardUnit * 1.2, 0 + standardUnit * .55 * (i + 1) + standardUnit * .065)
+				if(mouseDown) {
+					if(dist(mouseX - width / 2, mouseY - height / 2, this.posx + this.posInt, this.posy + standardUnit * .55 * (i + 1)) < standardUnit * .5 * this.sizew) {
+						this.selectedOption = i
+						this.displayActive = true
+						this.dropDownActive = !this.dropDownActive
+						this.selected = true
+						
+					}
+				}
+			}
+		}
+		pop()
+	}
+}
+
+class MenuButton {
+	constructor(posx, posy, sizew, sizeh, label, unitSizeX, unitSizeY, textS, holdable) {
+
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.label = label
+		this.textS = textS
+		this.unitSizeX = unitSizeX
+		this.unitSizeY = unitSizeY
+		this.holdable = holdable
+		this.toggle = false
+		this.stroke = 1
+	}
+
+	display() {
+		push()
+		translate(this.posx, this.posy)
+		rectMode(CENTER)
+		textAlign(CENTER)
+		textSize(this.textS)
+		// textAlign(RIGHT)
+		if(this.holdable == false){
+			this.active = false
+		}
+		
+		if(mouseDown) {
+			if(dist(mouseX - width / 2, mouseY - height / 2, this.posx, this.posy) < standardUnit * .5 * this.sizew) {
+				this.active = true
+			}
+		}
+		if(mouseUp == true) {
+			this.active = false
+		}
+		fill(0)
+		strokeWeight(this.stroke)
+		if(this.active == true || this.toggle == true) {
+			strokeWeight(0)
+			fill(colActive)
+		}
+		stroke(255)
+		blendMode(DIFFERENCE)
+		rect(0, 0, standardUnit * this.unitSizeX * this.sizew, standardUnit * this.unitSizeY * this.sizew)
+
+
+		noStroke()
+		fill(255)
+		text(this.label, 0, 0 + standardUnit * .08)
+		pop()
+	}
+}
+
+class Info{
+	constructor(posx, posy, sizew, sizeh, label, unitSizeX, unitSizeY, textS, holdable) {
+		this.sizew = sizew
+		this.sizeh = sizeh
+		this.posx = posx
+		this.posy = posy
+		this.label = label
+		this.textS = textS
+	}
+	display(){
+		push()
+		colorMode(HSB, 255)
+		textSize(fontSize * (standardUnit / 20))
+		fill("#FF8E15")
+		text("1", width/2 - standardUnit * 12.5, -height/2 + standardUnit * 5.3)
+		fill("#FF2D2D")
+		text("2", width/2 - standardUnit * 12.5, -height/2 + standardUnit * 8.7)
+		fill("#DF1666")
+		text("3", width/2 - standardUnit * 12.5, -height/2 + standardUnit * 10.7)
+		text("3", width/2 - standardUnit * 12.5, -height/2 + standardUnit * 14.7)
+		fill("#DD30CF")
+		text("4", width/2 - standardUnit * 12.5, -height/2 + standardUnit * 12.7)
+		fill("#6A4AF8")
+		text("5", width/2 - standardUnit * 1, -height/2 + standardUnit * 5.1)
+		fill("#31D5DE")
+		text("6", width/2 - standardUnit * 3.8, -height/2 + standardUnit * 19.3)
+		translate(this.posx, this.posy)
+		fill(0, 220)
+		stroke(255)
+		rect(-standardUnit * .2, -standardUnit * .4, standardUnit * 14.3, standardUnit * 18.9)
+		noStroke()
+		fill(255)
+		textSize(fontSize * (standardUnit / 45))
+		textFont(fontBody)
+		text("v0.0.1 r1\nRaoul Kuratle 2026\n\nIf you’ve never used a synthesiser before, here’s a quick rundown! If you don’t want to read, no\nworries, just play with the knobs and sliders and see what they do.\n\n1 – SOURCE: \nHere the music starts. A simple wave is the beginning of your shaping, think of it as a raw sound.\n This wave can be spiced up with another wave, try the MOD and HARMONISE knobs with \ndifferent shapes!\nYou can also add different NOISE types, just turn up it’s volume with the noise knob.\n\nThen the sound goes to the:\n\n2 – FILTER:\nThe filter removes high or spiky frequencies making the sound more muffled and bassy. Set the\namount with the CUTOFF. Resonance adds funky frequencies, try the RESONANCE knob.\n\nThe envelope knob controls how much it is influenced by the:\n\n3 – ENVELOPE:\nEnvelopes to the knob turning for you every time a note plays. They create a curve with attack,\ndecay, sustain and release.\nUse the sliders and watch what they do with the curve!\nYou have one for the filter, like the CUTOFF knob,\nAnd the volume, like the VOLUME knob.\n\nSimilar to envelopes there’s also:\n\n4 – LFOs:\nThese do the same thing as the envelopes, just not with a curve, but with a wave. Set the amount\nwith the DEPTH knob and the speed with the SPEED knob.\n\nAnd then you can try different:\n\n5 – EFFECTS:\nPlay with these to give your sound some oomph and character.\n\nYou set the notes in the:\n\n6 – SEQUENCER:\nIn the sequencer you can set your rhythms and notes for the synths.\nON\OFF lets you place notes\nNOTE lets you select and change the note (up and down arrows) and add chords (major minor)!\nMODE makes the note you change fit into a scale, so no music theory required!\n\nHave fun!", 0, 0)
+		blendMode(MULTIPLY)
+		fill("#FF8E15")
+		rect(0, standardUnit * 2, standardUnit * 5, fontSize * (standardUnit / 35))
+		fill("#FF2D2D")
+		rect(0, standardUnit * 5, standardUnit * 5, fontSize * (standardUnit / 35))
+		fill("#DF1666")
+		rect(0, standardUnit * 7.25, standardUnit * 5, fontSize * (standardUnit / 35))
+		fill("#DD30CF")
+		rect(0, standardUnit * 10.5, standardUnit * 5, fontSize * (standardUnit / 35))
+		fill("#6A4AF8")
+		rect(0, standardUnit * 12.8, standardUnit * 5, fontSize * (standardUnit / 35))
+		fill("#31D5DE")
+		rect(0, standardUnit * 14.7, standardUnit * 5, fontSize * (standardUnit / 35))
+		
+		pop()
+	}
+}
+
+class Explainer{
+	constructor(){
+
+	}
+	display(){
+		
+	}
+}
+</script>
+
+</body>
+</html>
