@@ -92,8 +92,8 @@ let synthIndex
 let knobActive = false
 let bpm
 
-let demoPresets = ['./presets/demo1.json', './presets/demo2.json', './presets/demo3.json', './presets/demo4.json']
-let initialize = ['./presets/initialize.json']
+let demoPresets
+let initialize
 let localData
 let userData = []
 let doubleClickTimer = 0
@@ -110,6 +110,8 @@ let saveSynthIndex
 let hideToggle = false
 
 function preload(){
+	demoPresets = ['./presets/demo1.json', './presets/demo2.json', './presets/demo3.json', './presets/demo4.json']
+	initialize = ['./presets/initialize.json']
 	font = loadFont('./includes/fonts/IosevkaCharon-Bold.ttf')
 	fontBody = loadFont('./includes/fonts/IosevkaCharon-Regular.ttf')
 }
