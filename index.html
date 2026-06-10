@@ -116,9 +116,7 @@ let demo4
 let initializePreset
 
 function preload(){
-	// initializePreset = loadJSON('./presets/initialize.json')
-
-	// demoPresets = ['./presets/demo1.json', './presets/demo2.json', './presets/demo3.json', './presets/demo4.json']
+	
 	initializePreset = loadJSON('./presets/initialize.json')
 	demoPresets = [loadJSON('./presets/demo1.json'), loadJSON('./presets/demo2.json'), loadJSON('./presets/demo3.json'), loadJSON('./presets/demo4.json')]
 
@@ -130,7 +128,7 @@ function setup() {
 
 	createCanvas(windowWidth, windowHeight)
 	pixelDensity(2)
-	// colActive = color(80, 0)
+	
 	textFont(font)
 	standardUnit = height * .045
 	scaleUniv = width / (width * 2)
@@ -154,10 +152,9 @@ function setup() {
 	}
 	input = createFileInput((file) => {
 		importData(file)
-	}).hide() //
+	}).hide() 
 	textInput = createInput()
 	textInput.position(width/2, -100)
-	// textInput.hide()
 	loadDemoPresets()
 }
 
@@ -166,7 +163,6 @@ function draw() {
 	updateVisuals()
 	background(0)
 
-	// clear()
 	translate(width / 2, height / 2)
 	push()
 	textSize(fontSize * 3)
@@ -235,22 +231,8 @@ function draw() {
 	}
 	fileMenu.display()
 	
-	// if(loadBuffer < 2) {
-		// 	loadBuffer++
-		// }
-		// if(loadBuffer < 3 && loading == true){
-			// 	for(let sk of synthekindas ){
-				// 		sk.masterVolControl = 60
-				// 	}
-				// 	loadBuffer+=.1
-				// 	synthSelect.synthIndex = floor(loadBuffer)
-				// }
-				// if(loadBuffer > 4 && loading == true){
-					// 	loading = false
-					// 	synthSelect.synthIndex = 0
-					// }
-		mouseDown = false
-		init = false
+	mouseDown = false
+	init = false
 	}
 	
 function keyPressed() {
@@ -286,12 +268,12 @@ function updateDataSequencer() {
 
 function updateDataSynth() {
 
-	// for(let sk of synthekindas) {
+	
 	for(let i = 0; i < synthekindas.length; i++) {
 		let sk = synthekindas[i]
 
 		sk.settingsSynth.effects.reverb.room = sk.effects.reverb.roomsizeKnob.knobPos
-		// sk.settingsSynth.effects.reverb.room = sk.effects.reverb.roomsizeKnob.knobPos
+		
 		sk.settingsSynth.effects.reverb.wet = sk.effects.reverb.mixKnob.knobPos
 
 		sk.settingsSynth.effects.delay.time = sk.effects.delay.delayTimeKnob.knobPos
@@ -336,7 +318,7 @@ function updateDataSynth() {
 
 		sk.settingsSynth.filter.cutoff = sk.filterVis.filterKnob.knobPos
 		sk.settingsSynth.filter.resonance = sk.filterVis.filterResonanceKnob.knobPos
-		// sk.settingsSynth.filter.feedback = sk.filterVis.filterFeedbackKnob.knobPos
+		
 		sk.settingsSynth.filter.feedback = sk.filterVis.filterEnvDepthKnob.knobPos
 
 		sk.settingsSynth.lfo.filterLfoFrequency = sk.lfo.lfo1.lfoSpeedKnob.knobPos
@@ -371,8 +353,7 @@ function updateVisuals() {
 		//color
 		ps.hSeed = 2
 		ps.hPhase = s.source.modKnob.knobPos * .05
-		// ps.hMin = constrain(map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, 0, 255) - map((s.filterVis.filterResonanceKnob.knobPos + (1 - s.source.noiseVol.knobPos)), 0, 2, 0, 255 / 2), 0, 255)
-		// ps.hMax = constrain(map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, 0, 255) + map((s.filterVis.filterResonanceKnob.knobPos + (1 - s.source.noiseVol.knobPos)), 0, 2, 0, 255 / 2), 0, 255)
+		
 		ps.hMin = map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, -.001, .001) - map((s.filterVis.filterResonanceKnob.knobPos), 0, 1, 0, .0003)
 		ps.hMax = map(s.synthMaster.panKnob.knobPos, 0.25, 0.75, -.001, .001) + map((s.filterVis.filterResonanceKnob.knobPos), 0, 1, 0, .0003)
 		ps.hStep = s.lfo.lfo1.lfoDepthKnob.knobPos * .25
@@ -380,7 +361,7 @@ function updateVisuals() {
 
 		ps.sSeed = 23
 		ps.sPhase = map(s.source.modKnob.knobPos, 0, 1, .5, 5)
-		// ps.sPhase = s.source.modKnob.knobPos * .05
+		
 		ps.sMin = (1 - s.source.noiseVol.knobPos) * 255
 		ps.sMax = s.source.oscVol.knobPos * 255
 		ps.sStep = s.lfo.lfo2.lfoDepthKnob.knobPos * .25
@@ -427,7 +408,7 @@ function updateVisuals() {
 		ps.curlPosxMult = s.effects.phaser.resKnob.knobPos * .02
 		ps.curlPosyMult = s.effects.vibrato.mixKnob.knobPos * .02
 		ps.curlPeriod = s.effects.delay.feedbackKnob.knobPos * .01
-		// ps.curlAmount = constrain(1 - s.filterVis.filterResonanceKnob.knobPos, 0.001, .5)
+		
 		ps.curlAmount = map(.5 - constrain(s.filterVis.filterResonanceKnob.knobPos + s.envVol.envSliders.envSlider_a.sliderPos, 0, 1), 0, 1, .001, 1)
 		ps.curlStep = s.effects.vibrato.mixKnob.knobPos * .5
 
@@ -495,9 +476,7 @@ function loadUserPresets(){
 			fileMenu.dropDownUser.options.push(userData[i])
 		}
 	}
-	// else{
-	// 	saveUserPreset() //create "settings" in localstorage on first load
-	// }
+	
 }
 
 function saveUserPreset(){
@@ -565,7 +544,7 @@ function importPresetData(path){
 function noiseSpeedy(time, seed, speed, phase, desiredMin, desiredMax, step) {
 
 	stepping = 1 / constrain(step, 0.0001, 1)
-	// noiseDetail(1, .5)
+	
 	noiseVal = noise(((time * speed) + phase) + (seed * 4123341.1231))
 	noiseVal = round(noiseVal * stepping) / stepping
 
@@ -714,12 +693,11 @@ class ParticleSystem {
 			this.p = this.particles[i]
 			this.p.time = this.time
 
-			// this.p.h = noiseSpeedy(this.time, i * this.hSeed + this.id, .003, i * this.hPhase, this.hMin, this.hMax, this.hStep) + fract(this.time * this.hCycleSpeed) * 255
-			// this.p.h = fract(this.time * this.hCycleSpeed) * 255
+			
 			this.p.h = fract((.25 * this.randSeed) + this.time * (this.hCycleSpeed + noiseSpeedy(this.time, i * this.hSeed + this.id, .003, i * this.hPhase, this.hMin, this.hMax, this.hStep))) * 255 + map(sin((this.time * (this.lfo1Freq/36))), -1, 1, -100 * this.lfo1Amp, 100 * this.lfo1Amp)
-			// this.p.h = fract(this.time * .001 + map(sin(this.time * (this.lfo1Freq / 360)), -1, 1, -this.lfo1Amp, this.lfo1Amp)) * 255 
+			
 			this.p.s = noiseSpeedy(this.time, i + this.randSeed, .001, i * .001, 0, this.sMax * map(sin((this.time * (this.lfo2Freq/36)) * .54), -1, 1, 1 - this.lfo1Dist, 1), this.sStep)
-			// this.p.s = noiseSpeedy(this.time, i, .001, i * .001, 0, 255, 0)
+			
 			this.p.b = noiseSpeedy(this.time, 0 + this.randSeed, .001, i * this.bPhase, this.bMin, this.bMax * map(sin((this.time * (this.lfo2Freq/36))), -1, 1, 1-this.lfo2Amp, 1), this.bStep)
 
 			this.p.initOffsetx = noiseSpeedy(this.time, 0 + this.randSeed, .001, i * this.initOffsetXPhase, -width / 4, width / 4, this.initOffsetXStep)
@@ -748,13 +726,11 @@ class ParticleSystem {
 
 class Particle {
 	constructor(time, pos, scale, color, id, initLifeVar, parentId) {
-		// this.posx = posx
-		// this.posy = posy
+		
 		this.layer
 		this.pos = pos
 		this.time = time
-		// this.initPosx = this.pos.x
-		// this.initPosy = this.pos.y
+		
 		this.pos.x = this.initPosx
 		this.pos.y = this.initPosy
 		this.initOffsetx = 1
@@ -793,10 +769,9 @@ class Particle {
 		if(this.reset == true) {
 			this.pos.x = this.initOffsetx
 			this.pos.y = this.initOffsety
-			// this.lifeVariance = random(0, 1)
+			
 		}
-		// this.color = color(this.h, this.s, this.b * (1-this.lifeCounter))
-		// this.color = color(this.h, this.s, this.b * ((1-this.colFadeAmount) + this.colorFadeInOut(this.lifeCounter)))
+		
 		this.color = color(this.h, this.s, this.b, constrain((1 - this.colFadeAmount) + this.colorFadeInOut(this.lifeCounter), 0, 1) * 255)
 		particleRender.fill(this.color)
 
@@ -990,8 +965,7 @@ class Synthekinda {
 			this.envVol.display()
 			this.envFilter.display()
 		}
-		// this.envVol.noteLength = this.noteLength
-		// this.envFilter.noteLength = this.noteLength
+		
 
 		//values to cache"""""""""""""""""""""""""""""""""""
 		this.synth.av = this.envVol.envSliders.a
@@ -1012,7 +986,7 @@ class Synthekinda {
 		this.filterKnobEase = pow(this.filterVis.filterKnob.knobVal, 2)
 		this.filter = map(this.filterKnobEase, 0, 1, 2, 2000)
 		this.filterResonance = map(this.filterVis.filterResonanceKnob.knobVal, 0, 1, 0, 40)
-		// this.filterFeedback = map(this.filterVis.filterFeedbackKnob.knobVal, 0, 1, 0, 1)
+		
 		this.synth.filterEnvDepth = map(this.filterVis.filterEnvDepthKnob.knobVal, 0, 1, 0, 8)
 		//"""""""""""""""""""""""""""""""""""
 
@@ -1509,8 +1483,7 @@ class SynthAudio {
 		this.osc.harmonicity.value = this.FMharmonicity
 
 		this.volOsc.volume.value = this.oscVolume
-		// this.volOsc2.volume.value = this.oscVolume
-		// this.volOsc3.volume.value = this.oscVolume
+		
 		this.volNoise.volume.value = this.noiseVolume
 		this.panning.pan.value = this.pan
 
@@ -1537,10 +1510,7 @@ class SynthAudio {
 
 		//–––––––––––––––––––––––––––val filter––––––––––––––––––––
 		this.filter.Q.value = this.filterRes
-		// this.feedbackNoise.resonance.value = this.filterFeedback
-		// this.feedbackNoise.delayTime.rampTo(1 / this.freq, 0)
-		// this.feedback.resonance.value = this.filterFeedback
-		// this.feedback.delayTime.rampTo(1 / this.freq, 0)
+		
 		this.filter.frequency.value = this.filterFreq
 		this.filterEnv.baseFrequency = this.freq
 
@@ -1569,18 +1539,15 @@ class SynthAudio {
 
 		
 		if(this.chordMode == 0) {
-			// this.osc2.mute = true
-			// this.osc3.mute = true
+			
 			this.volOsc2.volume.rampTo(-240, .01)
 			this.volOsc3.volume.rampTo(-240, .01)
 		} else {
-			// this.osc2.mute = false
-			// this.osc3.mute = false
+			
 			this.volOsc2.volume.rampTo(this.oscVolume, .01)
 			this.volOsc3.volume.rampTo(this.oscVolume, .01)
 		}
-		// this.osc2.frequency.value = this.freq2 * this.octave
-		// this.osc3.frequency.value = this.freq3 * this.octave
+		
 		this.osc.frequency.rampTo(this.freq * this.octave, 0.01)
 		this.osc2.frequency.rampTo(this.freq2 * this.octave, 0.01)
 		this.osc3.frequency.rampTo(this.freq3 * this.octave, 0.01)
@@ -1860,7 +1827,7 @@ class EnvSlider {
 		rect(0, -this.sliderPos * (standardUnit * 1.6) * this.sizeh, (standardUnit * .5) * this.sizew, (standardUnit * .15) * this.sizeh)
 
 		pop()
-		// this.sliderVal = map(this.sliderPos, -(standardUnit * 1.6) * this.sizeh, 0, 1, 0)
+		
 		this.sliderVal = this.sliderPos
 		pop()
 
@@ -1883,7 +1850,7 @@ class FilterVis {
 		this.cutoff = cutoff
 		this.filterKnob = new Knob(this.posx + (standardUnit * 7) * this.sizew, this.posy - (standardUnit * .5) * this.sizeh, 1.5, 1.5, "CUTOFF!", 0.5)
 		this.filterResonanceKnob = new Knob(this.posx + (standardUnit * 9.3) * this.sizew, this.posy - (standardUnit * .05) * this.sizeh, 1.2, 1.2, "RESONANCE!", 0)
-		// this.filterFeedbackKnob = new Knob(this.posx + (standardUnit * 11.5) * this.sizew, this.posy - (standardUnit * .65) * this.sizeh, 1.2, 1.2, "FEEDBACK!", PI)
+		
 		this.filterEnvDepthKnob = new Knob(this.posx + (standardUnit * 11.5) * this.sizew, this.posy - (standardUnit * .65) * this.sizeh, 1.2, 1.2, "ENVELOPE", 0.5)
 	}
 
@@ -1958,7 +1925,7 @@ class Knob {
 		this.posx = posx
 		this.label = label
 		this.labelVal = ""
-		// this.knobPos = 0 - this.defaultPos
+		
 		this.knobPos = 0.5
 		this.knobActive = false
 
@@ -2290,8 +2257,7 @@ class LFO {
 		this.shape2 = 0
 
 		this.lfoSelect = new LFOselect(this.posx, this.posy, 1, 1)
-		// this.lfo1 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble wobble)", synthekinda1.settingsSynth.lfo.filterLfoShape)
-		// this.lfo2 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble wobble)", synthekinda1.settingsSynth.lfo.volLfoShape)
+		
 		this.lfo1 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble)", 0)
 		this.lfo2 = new LFOVis(this.posx, this.posy, scaleUniv, scaleUniv, "LFO (Wobble)", 0)
 
@@ -2429,8 +2395,6 @@ class LFOVis {
 		text(this.label, this.posx, this.posy - (standardUnit * 2.2) * this.sizeh)
 		noFill()
 		stroke(globalWhite)
-
-		// this.type.shape = this.defaultShape
 
 		beginShape()
 		strokeWeight(1)
@@ -2586,10 +2550,9 @@ class Source {
 		this.posx = posx
 		this.label = label
 
-		// this.waveType = new WaveType(this.posx, this.posy, scaleUniv, scaleUniv, "SOURCE", synthekinda1.settingsSynth.source.shapeOsc, 1)
 		this.waveType = new WaveType(this.posx, this.posy, scaleUniv, scaleUniv, "SOURCE", 2, 1)
 		this.octaveSelect = new OctaveSelect(this.posx - standardUnit * .6, this.posy - standardUnit, scaleUniv, scaleUniv)
-		// this.modType = new WaveType(this.posx + standardUnit * 3, this.posy, scaleUniv, scaleUniv, "NASTIFY", synthekinda1.settingsSynth.source.shapeMod, 1)
+		
 		this.modType = new WaveType(this.posx + standardUnit * 3, this.posy, scaleUniv, scaleUniv, "NASTIFY", 2, 1)
 		this.harmonicityKnob = new Knob(this.posx + standardUnit * 2.15, this.posy, 1.3, 1.3, "harmonize", 0, 0)
 		this.modKnob = new Knob(this.posx + standardUnit * 2.15, this.posy - standardUnit * 1.1, 1.3, 1.3, "Mod it!", 0, 0)
@@ -2627,7 +2590,6 @@ class Noise {
 		this.posy = posy
 		this.widthPx = (standardUnit * 2) * this.sizew
 
-		// this.noiseShape = synthekinda1.settingsSynth.source.shapeNoise
 		this.noiseShape = 2
 
 		this.label = label
@@ -3356,7 +3318,6 @@ class Sequencer {
 
 		for(let i = 0; i < 4; i++) {
 
-			// synthekindas[i].noteLength = this.sequencerTracks[i].noteLength
 			synthekindas[i].synth.chordMode = this.sequencerTracks[i].chord
 			synthekindas[i].synth.freq = this.sequencerTracks[i].seqNote
 			synthekindas[i].synth.freq2 = this.sequencerTracks[i].seqNote3rd
@@ -3483,8 +3444,6 @@ class SequencerTrack {
 		textSize(fontSize * 1.3)
 		text(str(this.trackID + 1), - width / 2 + this.posx + standardUnit * .3, this.posy + standardUnit * (.6 * this.trackID) - standardUnit * .25)
 		this.seqTrigger = false
-		// this.noteLengthKnob.display()
-		// this.noteLength = map(this.noteLengthKnob.knobPos, 0, 1, .2, 5)
 
 		this.sequencerUnit[floor(this.x)].notePlayedBlip = true
 
@@ -3559,7 +3518,7 @@ class SequencerTrack {
 				this.seqNote = this.notes[this.sequencerUnit[floor(this.x)].note]
 				this.seqNote3rd = this.notes[this.sequencerUnit[floor(this.x)].note3rd] //sequencer track sends current note to sequencer
 				this.seqNote5th = this.notes[this.sequencerUnit[floor(this.x)].note5th]
-				// this.seqNote3rd = 100
+
 			}
 		} else {
 			this.seqTrigger = false
@@ -4129,11 +4088,9 @@ class FileMenu {
 			if(this.confirmNameButton.active == true){
 				writeUserData()
 				this.dropDownUser.options[this.dropDownUser.selectedOption].name = textInput.value()
-				//userData[this.dropDownUser.selectedOption - 1] = this.dropDownUser.options[this.dropDownUser.selectedOption - 1]
 				
 				userData[this.dropDownUser.selectedOption] = this.dropDownUser.options[this.dropDownUser.selectedOption]
-				// userData.push() = this.dropDownUser.options[this.dropDownUser.selectedOption]
-				//userData = this.dropDownUser.options
+				
 				saveUserPreset()
 				this.doNaming = false
 			}
@@ -4191,7 +4148,7 @@ class FileMenu {
 		
 		if(textInput.value().length > 29){
 			this.textInputScalar = (textInput.value().length - 29) * .8
-			// this.textInputScalar = (textInput.value().length - 29) * .9
+			
 		}else{
 			this.textInputScalar = 0
 		}
@@ -4237,7 +4194,7 @@ class DropDown {
 		fill(255)
 		if(this.options.length > 0 && this.displayActive){
 			text(this.options[this.selectedOption].name.toUpperCase(), 0 - standardUnit * 1.2, 0 + standardUnit * .1)
-			// text("TEST", 0 - standardUnit * 1.2, 0 + standardUnit * .1)
+			
 		}else{
 			text("Select Preset", 0 - standardUnit * 1.2, 0 + standardUnit * .1)
 		}
@@ -4321,7 +4278,7 @@ class MenuButton {
 		rectMode(CENTER)
 		textAlign(CENTER)
 		textSize(this.textS)
-		// textAlign(RIGHT)
+		
 		if(this.holdable == false){
 			this.active = false
 		}
