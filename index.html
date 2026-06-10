@@ -4082,7 +4082,7 @@ class FileMenu {
 			this.dropDownUser.selectedOption = this.dropDownUser.options.length-1
 			this.madeNew = true
 		}
-		if(this.dropDownUser.options[this.dropDownUser.selectedOption].name == "new"){
+		if(this.dropDownUser.options.length > 0 && this.dropDownUser.options[this.dropDownUser.selectedOption].name == "new"){
 			this.saveButton.stroke = map(sin(frameCount * .05), -1, 1, 1, 3)
 		}else{
 			this.saveButton.stroke = 1
