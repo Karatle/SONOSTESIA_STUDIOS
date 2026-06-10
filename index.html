@@ -164,10 +164,6 @@ function draw() {
 	background(0)
 
 	translate(width / 2, height / 2)
-	push()
-	textSize(fontSize * 3)
-	textAlign(RIGHT)
-	pop()
 	colorMode(HSB, 255)
 	
 	image(particleRender, -width / 2, -height / 2)
@@ -179,10 +175,14 @@ function draw() {
 	if(fileMenu.imageButton.active == true) {
 		saveCanvas()
 	}
-	
+	push()
+	textSize(fontSize * 3)
+	textAlign(RIGHT)
 	if(synthIndex < 4){
 		text("SONOSTHESIA STUDIO", width / 2 - standardUnit * 1, height / 2 - standardUnit * 19)
 	}
+	pop()
+	
 	if(fileMenu.fileButton.active == true) {
 		exportData()
 	}
