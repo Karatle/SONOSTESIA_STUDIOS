@@ -109,9 +109,19 @@ let font
 let saveSynthIndex
 let hideToggle = false
 
+let demo1
+let demo2
+let demo3
+let demo4
+let initializePreset
+
 function preload(){
-	demoPresets = ['./presets/demo1.json', './presets/demo2.json', './presets/demo3.json', './presets/demo4.json']
-	initialize = ['./presets/initialize.json']
+	// initializePreset = loadJSON('./presets/initialize.json')
+
+	// demoPresets = ['./presets/demo1.json', './presets/demo2.json', './presets/demo3.json', './presets/demo4.json']
+	initializePreset = loadJSON('./presets/initialize.json')
+	demoPresets = [loadJSON('./presets/demo1.json'), loadJSON('./presets/demo2.json'), loadJSON('./presets/demo3.json'), loadJSON('./presets/demo4.json')]
+
 	font = loadFont('./includes/fonts/IosevkaCharon-Bold.ttf')
 	fontBody = loadFont('./includes/fonts/IosevkaCharon-Regular.ttf')
 }
@@ -203,7 +213,6 @@ function draw() {
 			loading = false
 			synthSelect.synthIndex = 0
 	}
-	print(synthIndex)
 	sequencer.display()
 	
 	for(let sk of synthekindas) {
@@ -471,12 +480,12 @@ function writeUserData(){
 function loadDemoPresets(){
 	for(let i = 0; i < demoPresets.length; i++){
 		dp = demoPresets[i]
-		fileMenu.dropDownDemo.options.push(loadJSON(dp))
+		fileMenu.dropDownDemo.options.push(dp)
 	}
 }
 
 function newPreset(){
-	fileMenu.dropDownUser.options.push(loadJSON(initialize))
+	fileMenu.dropDownUser.options.push(initializePreset)
 }
 
 function loadUserPresets(){
@@ -4227,8 +4236,8 @@ class DropDown {
 		noStroke()
 		fill(255)
 		if(this.options.length > 0 && this.displayActive){
-			// text(this.options[this.selectedOption].name.toUpperCase(), 0 - standardUnit * 1.2, 0 + standardUnit * .1)
-			text("TEST", 0 - standardUnit * 1.2, 0 + standardUnit * .1)
+			text(this.options[this.selectedOption].name.toUpperCase(), 0 - standardUnit * 1.2, 0 + standardUnit * .1)
+			// text("TEST", 0 - standardUnit * 1.2, 0 + standardUnit * .1)
 		}else{
 			text("Select Preset", 0 - standardUnit * 1.2, 0 + standardUnit * .1)
 		}
