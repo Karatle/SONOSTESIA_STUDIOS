@@ -53,7 +53,7 @@ function println(msg){
 }
 
 
-let libs = ['/includes/libs/tone.js']
+let libs = ['./includes/libs/tone.js']
 // no p5sound
 
 let length = 6
@@ -92,8 +92,8 @@ let synthIndex
 let knobActive = false
 let bpm
 
-let demoPresets = ['/presets/demo1.json', '/presets/demo2.json', '/presets/demo3.json', '/presets/demo4.json']
-let initialize = ['/presets/initialize.json']
+let demoPresets = ['./presets/demo1.json', './presets/demo2.json', './presets/demo3.json', './presets/demo4.json']
+let initialize = ['./presets/initialize.json']
 let localData
 let userData = []
 let doubleClickTimer = 0
@@ -110,8 +110,8 @@ let saveSynthIndex
 let hideToggle = false
 
 function preload(){
-	font = loadFont('/includes/fonts/IosevkaCharon-Bold.ttf')
-	fontBody = loadFont('/includes/fonts/IosevkaCharon-Regular.ttf')
+	font = loadFont('./includes/fonts/IosevkaCharon-Bold.ttf')
+	fontBody = loadFont('./includes/fonts/IosevkaCharon-Regular.ttf')
 }
 
 function setup() {
