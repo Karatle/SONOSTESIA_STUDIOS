@@ -167,9 +167,6 @@ function draw() {
 	push()
 	textSize(fontSize * 3)
 	textAlign(RIGHT)
-	if(synthIndex < 4){
-		text("SONOSTHESIA STUDIO", width / 2 - standardUnit * 1, height / 2 - standardUnit * 19)
-	}
 	pop()
 	colorMode(HSB, 255)
 	
@@ -183,6 +180,9 @@ function draw() {
 		saveCanvas()
 	}
 	
+	if(synthIndex < 4){
+		text("SONOSTHESIA STUDIO", width / 2 - standardUnit * 1, height / 2 - standardUnit * 19)
+	}
 	if(fileMenu.fileButton.active == true) {
 		exportData()
 	}
