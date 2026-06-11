@@ -489,8 +489,15 @@ function saveUserPreset(){
 }
 function deleteUserPreset(){
 	userData.splice(fileMenu.dropDownUser.selectedOption, 1)
-	fileMenu.dropDownUser.options = userData
+	if(userData.length == 0){
+		newPreset()
+	}
+	if(userData.length > 0){
+		fileMenu.dropDownUser.options = userData
+	}
+	
 	fileMenu.dropDownUser.selectedOption = fileMenu.dropDownUser.options.length - 1
+	
 	saveUserPreset()
 }
 
