@@ -3966,6 +3966,7 @@ class FileMenu {
 		this.doNaming = false
 		this.override = false
 		this.displayInfo = false
+		this.hasNew = false
 		
 	}
 	display() {
@@ -4044,9 +4045,18 @@ class FileMenu {
 			this.madeNew = false
 		}
 		if(this.newButton.active == true || init == true){
-			newPreset()
-			this.dropDownUser.selectedOption = this.dropDownUser.options.length-1
-			this.madeNew = true
+			for(let up of this.dropDownUser.options){
+				if(up.name == "new"){
+					this.hasNew = true
+				}else{
+					this.hasNew = false
+				}
+			}
+			if(this.hasNew == false){
+				newPreset()
+				this.dropDownUser.selectedOption = this.dropDownUser.options.length-1
+				this.madeNew = true
+			}
 		}
 		if(this.dropDownUser.options.length > 0 && this.dropDownUser.options[this.dropDownUser.selectedOption].name == "new"){
 			this.saveButton.stroke = map(sin(frameCount * .05), -1, 1, 1, 3)
