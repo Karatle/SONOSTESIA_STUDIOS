@@ -103,7 +103,7 @@ let doubleClicked = false
 let loading = true
 let init = false
 let initCheck = false
-
+let initAudioUser = true
 
 let font
 let saveSynthIndex
@@ -253,6 +253,10 @@ function keyPressed() {
 }
 
 function mousePressed() {
+	if(initAudioUser == true){
+		Tone.start()
+		initAudioUser = false
+	}
 	updateDataSynth()
 	updateDataSequencer()
 	updateVisuals()
