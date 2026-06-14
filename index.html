@@ -114,6 +114,11 @@ let demo2
 let demo3
 let demo4
 let initializePreset
+let data
+let expData
+
+let dataComp1
+let dataComp2
 
 function preload(){
 	
@@ -128,7 +133,6 @@ function setup() {
 
 	createCanvas(windowWidth, windowHeight)
 	pixelDensity(2)
-	
 	textFont(font)
 	standardUnit = height * .045
 	scaleUniv = width / (width * 2)
@@ -139,8 +143,8 @@ function setup() {
 	particleRender.clear()
 
 	fileMenu = new FileMenu(width / 2 - standardUnit * 10, height / 2 - standardUnit * 21, scaleUniv, scaleUniv, "File Menu")
-	
 	loadUserPresets()
+	
 	synthSelect = new SynthSelect(width / 2 - standardUnit * 11, height / 2 - standardUnit * 18.5, scaleUniv, scaleUniv, "SYNTH", 1, 0)
 	sequencer = new Sequencer(width / 2 - standardUnit * 7, height - standardUnit * 13.7, scaleUniv, scaleUniv)
 	
@@ -173,7 +177,12 @@ function draw() {
 	}
 	
 	if(fileMenu.imageButton.active == true) {
-		saveCanvas()
+		if(fileMenu.dropDownDemo.displayActive == true){
+			saveCanvas("SONSOTHESIA " + trim(fileMenu.dropDownDemo.options[fileMenu.dropDownDemo.selectedOption].name) + "_" + day() + month() + year())
+		}
+		if(fileMenu.dropDownUser.displayActive == true){
+			saveCanvas("SONSOTHESIA_" + trim(fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption].name) + "_" + day() + month() + year())
+		}
 	}
 	push()
 	textSize(fontSize * 3)
@@ -229,6 +238,7 @@ function draw() {
 		doubleClickTimer = 0
 		doubleClickInit = false
 	}
+
 	fileMenu.display()
 	
 	mouseDown = false
@@ -437,11 +447,18 @@ function exportData() {
 		synthData.push(sk.settingsSynth)
 	}
 	sequencerUnitData = sequencer.sequencerData
-
-	let data = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: "preset1", settingsSynth: synthData, sequencer: sequencerUnitData }
-	saveJSON(data, "dataTest")
+	
+	// let data = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: "preset1", settingsSynth: synthData, sequencer: sequencerUnitData }
+	if(fileMenu.dropDownDemo.displayActive == true){
+		expData = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: trim(fileMenu.dropDownDemo.options[fileMenu.dropDownDemo.selectedOption].name), settingsSynth: synthData, sequencer: sequencerUnitData }
+	}
+	if(fileMenu.dropDownUser.displayActive == true){
+		expData = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: trim(fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption].name), settingsSynth: synthData, sequencer: sequencerUnitData }
+	}
+	saveJSON(expData, "SONSOTHESIA_settings_" + expData.name + "_" + day() + month() + year())
+	
 }
-function writeUserData(){
+function writeUserData(name){
 	updateDataSynth()
 	updateDataSequencer()
 
@@ -454,8 +471,9 @@ function writeUserData(){
 	}
 	sequencerUnitData = sequencer.sequencerData
 
-	let data = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: "preset1", settingsSynth: synthData, sequencer: sequencerUnitData }
-	fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption] = data
+	let data = { tool: "The Synthekinda", version: "0.0.1", rev: "0", name: name, settingsSynth: synthData, sequencer: sequencerUnitData }
+	// fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption] = data
+	userData[fileMenu.dropDownUser.selectedOption] = data
 }
 
 function loadDemoPresets(){
@@ -466,17 +484,17 @@ function loadDemoPresets(){
 }
 
 function newPreset(){
-	fileMenu.dropDownUser.options.push(initializePreset)
+	fileMenu.dropDownUser.options.push(loadJSON('./presets/initialize.json'))
 }
 
 function loadUserPresets(){
 	if(localStorage.hasOwnProperty("UserPresets")){ //check if "settings" exists in localstorage
 		userData = JSON.parse(localStorage.getItem("UserPresets"))
-		for(let i = 0; i < userData.length; i++){
-			fileMenu.dropDownUser.options.push(userData[i])
-		}
+		// for(let i = 0; i < userData.length; i++){
+		// 	fileMenu.dropDownUser.options.push(userData[i])
+		// }
+		fileMenu.dropDownUser.options = userData
 	}
-	
 }
 
 function saveUserPreset(){
@@ -525,7 +543,6 @@ function importData(file) {
 
 }
 function importPresetData(path){
-
 	let presetData = path
 	for(let i = 0; i < presetData.settingsSynth.length; i++) {
 		j = presetData.settingsSynth[i]
@@ -3967,6 +3984,7 @@ class FileMenu {
 		this.override = false
 		this.displayInfo = false
 		this.hasNew = false
+		this.warnName = false
 		
 	}
 	display() {
@@ -3994,12 +4012,11 @@ class FileMenu {
 		text("Yours!", this.posx - standardUnit * 1.5, this.posy + standardUnit * .6)
 		text("EXPORT", this.posx + standardUnit * 8.1, this.posy - standardUnit * .5)
 
-		
 		this.dropDownUser.display()
 		this.dropDownDemo.display()
+		this.saveButton.display()
 		this.newButton.display()
 		this.deleteButton.display()
-		this.saveButton.display()
 		this.overrideButton.display()
 		this.loadButton.display()
 		this.imageButton.display()
@@ -4027,6 +4044,12 @@ class FileMenu {
 			this.dropDownDemo.dropDownActive = false
 		}
 		
+		if(this.madeNew == true){
+			importPresetData(fileMenu.dropDownUser.options[fileMenu.dropDownUser.options.length-1])
+			loading = true
+			loadBuffer = 0
+			this.madeNew = false
+		}
 		if(this.dropDownDemo.selected == true){
 			this.dropDownUser.dropDownActive = false
 			this.dropDownUser.displayActive = false
@@ -4039,10 +4062,6 @@ class FileMenu {
 			importPresetData(fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption])
 			loading = true
 			loadBuffer = 0
-		}
-		if(this.madeNew == true){
-			importPresetData(fileMenu.dropDownUser.options[fileMenu.dropDownUser.selectedOption])
-			this.madeNew = false
 		}
 		if(this.newButton.active == true || init == true){
 			for(let up of this.dropDownUser.options){
@@ -4096,19 +4115,18 @@ class FileMenu {
 				this.override = false
 			}
 		}
-		
+
 		if(this.saveButton.active == true && this.dropDownUser.options.length > 0 && this.dropDownUser.options[this.dropDownUser.selectedOption].name == "new"){
 			this.doNaming = true
 		}
 		if(this.doNaming == true){
 			this.name()
-			if(this.confirmNameButton.active == true){
-				writeUserData()
-				this.dropDownUser.options[this.dropDownUser.selectedOption].name = textInput.value()
-				
-				userData[this.dropDownUser.selectedOption] = this.dropDownUser.options[this.dropDownUser.selectedOption]
-				
-				saveUserPreset()
+			if(this.confirmNameButton.active == true && textInput.value().length > 0){
+				writeUserData(textInput.value()) //save current synth and sequencer settings to dropDownUser.option[...selectedoption]
+				// userData[this.dropDownUser.selectedOption] = this.dropDownUser.options[this.dropDownUser.selectedOption] //update userData with previously updated dropDownUser.option[...selectedoption]
+				saveUserPreset() //splice anything called "new" and replace local storage settings with updated ones
+				loadUserPresets()
+				this.warnName = false
 				this.doNaming = false
 			}
 		}
@@ -4158,7 +4176,18 @@ class FileMenu {
 		fill(255)
 		noStroke()
 		textSize(this.textS)
-		text("I am nameless, give me one", 0, -standardUnit * 1)
+		if(this.confirmNameButton.active == true && textInput.value().length == 0){
+			this.warnName = true
+		}
+		if(this.warnName == false){
+			text("I am nameless, give me one", 0, -standardUnit * 1)
+		}
+		if(this.warnName == true){
+			textSize(this.textS * 2)
+			fill(255, 0, 0)
+			text("I AM NAMELESS, GIVE ME ONE", 0, -standardUnit * 1)
+		}
+
 		if(mouseDown){
 		textInput.elt.focus()
 		}
@@ -4173,9 +4202,6 @@ class FileMenu {
 		textSize(this.textS * 1.7 - this.textInputScalar)
 		text(textInput.value(), 0, 0 + standardUnit * .1)
 		
-		if(this.confirmNameButton.active == true){
-			this.doNaming = false
-		}
 		pop()
 	}
 }
@@ -4287,6 +4313,7 @@ class MenuButton {
 		this.holdable = holdable
 		this.toggle = false
 		this.stroke = 1
+		this.active = false
 	}
 
 	display() {
